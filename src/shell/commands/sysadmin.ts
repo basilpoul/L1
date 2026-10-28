@@ -2,6 +2,8 @@ import { registry } from '../commandRegistry';
 import { resolvePath } from '../../vfs/pathResolver';
 import type { ShellState, CommandResult } from '../../types';
 import type { VirtualFileSystem } from '../../vfs/fileSystem';
+import { getDockerState } from './docker';
+import { getUfwState } from './security';
 
 const SYS_STORAGE_KEY = 'linux-sim-sysadmin';
 
@@ -400,6 +402,20 @@ export function registerSysadminCommands() {
       header.push(`tcp        0      0 ${addr.padEnd(23)} 0.0.0.0:*               LISTEN      ${s.pid}/${s.name}`);
     }
 
+    // Include running Docker container ports
+    try {
+      const dockerState = getDockerState();
+      const runningContainers = dockerState.containers.filter(c => c.status === 'running');
+      for (const cnt of runningContainers) {
+        for (const p of cnt.ports) {
+          const addr = `0.0.0.0:${p.hostPort}`;
+          header.push(`tcp        0      0 ${addr.padEnd(23)} 0.0.0.0:*               LISTEN      3821/docker-proxy`);
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     return { stdout: header.join('\n'), stderr: '', exitCode: 0 };
   };
 
@@ -458,6 +474,62 @@ export function registerSysadminCommands() {
 
     if (!targetUrl) {
       return { stdout: '', stderr: 'curl: try \'curl --help\' for more information', exitCode: 2 };
+    }
+
+    // Check UFW firewall for target port if local
+    let portMatch = targetUrl.match(/(?:localhost|127\.0\.0\.1):(\d+)/);
+    let targetPort = portMatch ? parseInt(portMatch[1], 10) : (targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1') ? 80 : 0);
+
+    const ufw = getUfwState();
+    if (ufw.enabled && targetPort > 0) {
+      const denyRule = ufw.rules.find(r => r.port === targetPort && r.action === 'DENY');
+      if (denyRule) {
+        return {
+          stdout: '',
+          stderr: `curl: (7) Failed to connect to localhost port ${targetPort}: Connection refused by firewall`,
+          exitCode: 7,
+        };
+      }
+    }
+
+    // Check Docker container port bindings
+    const dockerState = getDockerState();
+    const dockerContainer = dockerState.containers.find(
+      c => c.status === 'running' && c.ports.some(p => p.hostPort === targetPort)
+    );
+
+    if (dockerContainer && targetPort !== 80) {
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto; font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and working in Docker container '${dockerContainer.name}'.</p>
+<p><em>Thank you for using LinuxSim Docker Engine.</em></p>
+</body>
+</html>`;
+
+      if (headersOnly) {
+        return {
+          stdout: `HTTP/1.1 200 OK\nServer: ${dockerContainer.image}\nDate: ${new Date().toUTCString()}\nContent-Type: text/html\nContent-Length: ${html.length}\nConnection: keep-alive`,
+          stderr: '',
+          exitCode: 0,
+        };
+      }
+
+      if (outputFile) {
+        const dest = resolve(outputFile, shellState);
+        vfs.writeFile(dest, html);
+        return { stdout: '', stderr: '', exitCode: 0 };
+      }
+
+      return { stdout: html, stderr: '', exitCode: 0 };
     }
 
     // Router for local simulated addresses

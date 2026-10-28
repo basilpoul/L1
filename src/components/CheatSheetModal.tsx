@@ -37,6 +37,10 @@ export const CheatSheetModal: React.FC<CheatSheetModalProps> = ({
   };
 
   const categorize = (name: string): string => {
+    const vim = ['vim', 'vi'];
+    const git = ['git'];
+    const docker = ['docker'];
+    const security = ['useradd', 'userdel', 'su', 'passwd', 'groups', 'usermod', 'ufw', 'ssh', 'scp'];
     const nav = ['pwd', 'ls', 'cd', 'tree', 'find'];
     const files = ['mkdir', 'touch', 'rm', 'cp', 'mv'];
     const text = ['cat', 'echo', 'grep', 'head', 'tail', 'wc', 'sort', 'uniq', 'nano'];
@@ -47,6 +51,10 @@ export const CheatSheetModal: React.FC<CheatSheetModalProps> = ({
     const sys = ['neofetch', 'uname', 'hostname', 'date', 'uptime', 'cal', 'df', 'du', 'free', 'ps', 'top', 'htop', 'kill', 'ping'];
     const script = ['bash', 'sh'];
 
+    if (vim.includes(name)) return 'Vim Editor';
+    if (git.includes(name)) return 'Git & Version Control';
+    if (docker.includes(name)) return 'Docker Containers';
+    if (security.includes(name)) return 'Security & Users';
     if (powerText.includes(name)) return 'Power Text';
     if (archives.includes(name)) return 'Archives & Links';
     if (sysadmin.includes(name)) return 'SysAdmin & Network';
@@ -61,6 +69,10 @@ export const CheatSheetModal: React.FC<CheatSheetModalProps> = ({
 
   const categories = [
     'all',
+    'Vim Editor',
+    'Git & Version Control',
+    'Docker Containers',
+    'Security & Users',
     'Navigation',
     'File Ops',
     'Text & Pipes',

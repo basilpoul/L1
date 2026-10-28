@@ -8,6 +8,7 @@ import { registry } from './commandRegistry';
 import type { ExecutionContext } from './commandRegistry';
 import type { Pipeline, PipelineStage } from './parser';
 import { executeScriptFile } from './scriptRunner';
+import { REMOTE_PROD_FILES } from './commands/security';
 
 /**
  * Expand aliases in the input string.
@@ -330,6 +331,59 @@ export async function executeCommand(
     shellState.history[shellState.history.length - 1] !== trimmed
   ) {
     shellState.history.push(trimmed);
+  }
+
+  // Handle remote interactive session
+  if (shellState.remoteSession) {
+    if (trimmed === 'exit' || trimmed === 'logout') {
+      shellState.remoteSession = null;
+      const msg = 'Connection to 10.0.0.5 closed.';
+      context.addLine('output', msg);
+      return { stdout: msg, stderr: '', exitCode: 0 };
+    }
+    const session = shellState.remoteSession;
+    const parts = trimmed.split(/\s+/);
+    const cmd = parts[0];
+    const args = parts.slice(1);
+
+    let res: CommandResult = { stdout: '', stderr: '', exitCode: 0 };
+    if (cmd === 'pwd') {
+      res = { stdout: session.cwd, stderr: '', exitCode: 0 };
+    } else if (cmd === 'whoami') {
+      res = { stdout: session.user, stderr: '', exitCode: 0 };
+    } else if (cmd === 'hostname') {
+      res = { stdout: session.hostname, stderr: '', exitCode: 0 };
+    } else if (cmd === 'uname') {
+      res = {
+        stdout: 'Linux prod-node 5.15.0-89-generic #99-Ubuntu SMP Mon Dec 4 12:00:00 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux',
+        stderr: '',
+        exitCode: 0,
+      };
+    } else if (cmd === 'ls') {
+      const files = Object.keys(REMOTE_PROD_FILES)
+        .filter(p => p.startsWith(session.cwd))
+        .map(p => p.slice(session.cwd.length).replace(/^\//, ''))
+        .filter(p => p && !p.includes('/'));
+      res = { stdout: files.join('  '), stderr: '', exitCode: 0 };
+    } else if (cmd === 'cat') {
+      const fileArg = args[0] || '';
+      const fullP = fileArg.startsWith('/') ? fileArg : `${session.cwd}/${fileArg}`;
+      if (REMOTE_PROD_FILES[fullP] !== undefined) {
+        res = { stdout: REMOTE_PROD_FILES[fullP].trimEnd(), stderr: '', exitCode: 0 };
+      } else {
+        res = { stdout: '', stderr: `cat: ${fileArg}: No such file or directory`, exitCode: 1 };
+      }
+    } else if (cmd === 'cd') {
+      const target = args[0] || '/home/admin';
+      session.cwd = target.startsWith('/') ? target : `${session.cwd}/${target}`.replace(/\/+/g, '/');
+      res = { stdout: '', stderr: '', exitCode: 0 };
+    } else {
+      res = { stdout: `[prod-node]: Executed '${trimmed}'`, stderr: '', exitCode: 0 };
+    }
+
+    if (res.stdout) context.addLine('output', res.stdout);
+    if (res.stderr) context.addLine('error', res.stderr);
+    return res;
   }
 
   // Handle comments

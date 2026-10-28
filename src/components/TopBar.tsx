@@ -1,20 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, RefreshCw, BookOpen, User, FolderOpen, Download, Upload } from 'lucide-react';
+import { Terminal, RefreshCw, BookOpen, User, FolderOpen, Download, Upload, Activity } from 'lucide-react';
 
 interface TopBarProps {
   cwd: string;
+  currentUser?: string;
   onReset: () => void;
   onOpenCheatSheet: () => void;
   onExportVFS?: () => void;
   onImportVFS?: (jsonString: string) => void;
+  onToggleSystemMonitor?: () => void;
+  isSystemMonitorOpen?: boolean;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
   cwd,
+  currentUser = 'user@linux-box',
   onReset,
   onOpenCheatSheet,
   onExportVFS,
   onImportVFS,
+  onToggleSystemMonitor,
+  isSystemMonitorOpen,
 }) => {
   const [time, setTime] = useState(() => new Date());
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -72,9 +78,24 @@ export const TopBar: React.FC<TopBarProps> = ({
 
       {/* Right side */}
       <div className="flex items-center gap-3">
+        {onToggleSystemMonitor && (
+          <button
+            onClick={onToggleSystemMonitor}
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs transition-colors border ${
+              isSystemMonitorOpen
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                : 'text-slate-400 hover:text-white hover:bg-white/5 border-white/5'
+            }`}
+            title="Toggle System Monitor"
+          >
+            <Activity size={12} className={isSystemMonitorOpen ? 'text-emerald-400 animate-pulse' : 'text-slate-400'} />
+            <span className="hidden sm:inline">Monitor</span>
+          </button>
+        )}
+
         <div className="flex items-center gap-1.5">
           <User size={12} className="text-slate-500" />
-          <span className="text-xs text-slate-400 font-mono">user@linux-box</span>
+          <span className="text-xs text-slate-400 font-mono">{currentUser}</span>
         </div>
 
         <span className="text-xs text-slate-500 font-mono tabular-nums">{formatTime(time)}</span>

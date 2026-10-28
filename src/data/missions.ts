@@ -1,6 +1,8 @@
 import type { Mission } from '../types';
 import type { VirtualFileSystem } from '../vfs/fileSystem';
 import { isServiceRunning } from '../shell/commands/sysadmin';
+import { getDockerState } from '../shell/commands/docker';
+import { getUfwState } from '../shell/commands/security';
 
 /**
  * 15 progressive missions that teach Linux fundamentals.
@@ -422,6 +424,171 @@ export const missions: Mission[] = [
       const auditNode = vfs.getNode('/home/user/audit.txt', true);
       if (!auditNode || !auditNode.content) return false;
       return auditNode.content.includes('Active Internet connections') || auditNode.content.includes('127.0.0.53:53') || auditNode.content.includes('LISTEN');
+    },
+  },
+
+  // ── Master (DevOps & Security) (26-35) ─────────────────────────
+
+  {
+    id: 'mission-26',
+    title: 'Vim Mastery',
+    description:
+      'Open ~/Documents/notes.txt in vim, add the line "Edited with Vim", and save/quit with :wq.',
+    difficulty: 'master',
+    hint: 'vim ~/Documents/notes.txt -> press i -> add "Edited with Vim" -> Esc -> :wq',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, history: string[]): boolean => {
+      const node = vfs.getNode('/home/user/Documents/notes.txt', true);
+      const hasVimHistory = history.some(c => c.startsWith('vim') || c.startsWith('vi ') || c.includes('notes.txt'));
+      return hasVimHistory && !!node?.content?.includes('Edited with Vim');
+    },
+  },
+
+  {
+    id: 'mission-27',
+    title: 'Git Initialization & First Commit',
+    description:
+      'Initialize a Git repo in ~/projects, stage all files with `git add .`, and create a commit with `git commit -m "Initial commit"`.',
+    difficulty: 'master',
+    hint: 'cd ~/projects && git init && git add . && git commit -m "Initial commit"',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const gitNode = vfs.getNode('/home/user/projects/.git', false);
+      const commitsNode = vfs.getNode('/home/user/projects/.git/commits.json', true);
+      if (!gitNode || !commitsNode?.content) return false;
+      return commitsNode.content.includes('Initial commit');
+    },
+  },
+
+  {
+    id: 'mission-28',
+    title: 'Git Branching',
+    description:
+      'In ~/projects, create and switch to a new branch named `feature/login` using `git checkout -b feature/login`.',
+    difficulty: 'master',
+    hint: 'cd ~/projects && git checkout -b feature/login',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const headNode = vfs.getNode('/home/user/projects/.git/HEAD', true);
+      const branchNode = vfs.getNode('/home/user/projects/.git/branches.json', true);
+      const onBranch = headNode?.content?.includes('feature/login') === true;
+      const branchExists = branchNode?.content?.includes('feature/login') === true;
+      return onBranch || branchExists;
+    },
+  },
+
+  {
+    id: 'mission-29',
+    title: 'Clone & Inspect',
+    description:
+      'Clone https://git.linuxsim.local/devops/webapp.git into ~/webapp using `git clone`.',
+    difficulty: 'master',
+    hint: 'git clone https://git.linuxsim.local/devops/webapp.git ~/webapp',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const pkgNode = vfs.getNode('/home/user/webapp/package.json', true);
+      const serverNode = vfs.getNode('/home/user/webapp/server.js', true);
+      const gitNode = vfs.getNode('/home/user/webapp/.git', false);
+      return !!pkgNode && !!serverNode && !!gitNode;
+    },
+  },
+
+  {
+    id: 'mission-30',
+    title: 'Docker Deployment',
+    description:
+      'Run an nginx container in detached mode named `web-proxy` mapped to port 8080:80.',
+    difficulty: 'master',
+    hint: 'docker run -d -p 8080:80 --name web-proxy nginx:latest',
+    completed: false,
+    validator: (_vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const state = getDockerState();
+      return state.containers.some(
+        c =>
+          c.name === 'web-proxy' &&
+          c.status === 'running' &&
+          c.ports.some(p => p.hostPort === 8080 && p.containerPort === 80)
+      );
+    },
+  },
+
+  {
+    id: 'mission-31',
+    title: 'User Provisioning',
+    description:
+      'Create a new user named `devops` with a home directory using `sudo useradd -m devops`.',
+    difficulty: 'master',
+    hint: 'sudo useradd -m devops',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const passwd = vfs.getNode('/etc/passwd', true);
+      const home = vfs.getNode('/home/devops', false);
+      return !!passwd?.content?.includes('devops:') && !!home;
+    },
+  },
+
+  {
+    id: 'mission-32',
+    title: 'Firewall Hardening',
+    description:
+      'Enable the firewall (`sudo ufw enable`), allow SSH (`sudo ufw allow 22`), allow HTTP (`sudo ufw allow 80`), and deny port 23 (`sudo ufw deny 23`).',
+    difficulty: 'master',
+    hint: 'sudo ufw enable && sudo ufw allow 22 && sudo ufw allow 80 && sudo ufw deny 23',
+    completed: false,
+    validator: (_vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const ufw = getUfwState();
+      if (!ufw.enabled) return false;
+      const has22 = ufw.rules.some(r => r.port === 22 && r.action === 'ALLOW');
+      const has80 = ufw.rules.some(r => r.port === 80 && r.action === 'ALLOW');
+      const has23 = ufw.rules.some(r => r.port === 23 && r.action === 'DENY');
+      return has22 && has80 && has23;
+    },
+  },
+
+  {
+    id: 'mission-33',
+    title: 'Remote SCP Transfer',
+    description:
+      'Copy admin@10.0.0.5:/home/admin/flag.txt from the remote production node into ~/flag.txt using `scp`.',
+    difficulty: 'master',
+    hint: 'scp admin@10.0.0.5:/home/admin/flag.txt ~/flag.txt',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const flagNode = vfs.getNode('/home/user/flag.txt', true);
+      return !!flagNode?.content?.includes('FLAG{pwn_th3_pr0d_s3rv3r_2026}');
+    },
+  },
+
+  {
+    id: 'mission-34',
+    title: 'Cron Automation',
+    description:
+      'Schedule a cron job in /etc/crontab and ensure the `cron` daemon is running via `systemctl`.',
+    difficulty: 'master',
+    hint: 'echo "* * * * * root date >> /var/log/cron.log" | sudo tee -a /etc/crontab && sudo systemctl start cron',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const crontab = vfs.getNode('/etc/crontab', true);
+      const isRunning = isServiceRunning('cron');
+      const hasJob = crontab?.content?.split('\n').some(l => l.trim() && !l.trim().startsWith('#'));
+      return isRunning && !!hasJob;
+    },
+  },
+
+  {
+    id: 'mission-35',
+    title: 'Full DevOps Pipeline',
+    description:
+      'Clone webapp to ~/webapp, create backup archive ~/webapp_backup.tar.gz, ensure nginx is running, and write "DEPLOY_OK" to ~/deploy_status.txt.',
+    difficulty: 'master',
+    hint: 'git clone https://git.linuxsim.local/devops/webapp.git ~/webapp && tar -czvf ~/webapp_backup.tar.gz ~/webapp && sudo systemctl start nginx && echo "DEPLOY_OK" > ~/deploy_status.txt',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const webappNode = vfs.getNode('/home/user/webapp', false);
+      const backupNode = vfs.getNode('/home/user/webapp_backup.tar.gz', false) || vfs.getNode('/home/user/backup.tar.gz', false);
+      const nginxRunning = isServiceRunning('nginx');
+      const statusNode = vfs.getNode('/home/user/deploy_status.txt', true);
+      return !!webappNode && !!backupNode && nginxRunning && !!statusNode?.content;
     },
   },
 ];

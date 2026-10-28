@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef } from 'react';
-import type { TerminalTab, TerminalLine, ShellState, NanoState } from '../types';
+import type { TerminalTab, TerminalLine, ShellState, NanoState, VimState } from '../types';
 import { VirtualFileSystem } from '../vfs/fileSystem';
 import { executeCommand, getCompletions } from '../shell/executor';
 import { createDefaultEnv } from '../shell/environment';
+import { getGitBranchInfo } from '../shell/commands/git';
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 9);
@@ -68,6 +69,7 @@ function createTab(index: number, vfs?: VirtualFileSystem): TerminalTab {
     shellState,
     isRunning: false,
     nanoState: null,
+    vimState: null,
   };
 }
 
@@ -132,7 +134,20 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
     if (!tab || tab.isRunning) return;
 
     const cmd = inputValue.trim();
-    const prompt = `<span style="color:#4ade80;font-weight:bold">${tab.shellState.env['USER'] || 'user'}@linux-box</span>:<span style="color:#60a5fa;font-weight:bold">${tab.shellState.cwd === (tab.shellState.env['HOME'] || '/home/user') ? '~' : tab.shellState.cwd.replace(tab.shellState.env['HOME'] || '/home/user', '~')}</span>$ ${cmd.replace(/</g, '&lt;').replace(/>/g, '&gt;')}`;
+    const session = tab.shellState.remoteSession;
+    let prompt = '';
+    if (session) {
+      prompt = `<span style="color:#4ade80;font-weight:bold">${session.user}@${session.hostname}</span>:<span style="color:#60a5fa;font-weight:bold">${session.cwd}</span>$ ${cmd.replace(/</g, '&lt;').replace(/>/g, '&gt;')}`;
+    } else {
+      const user = tab.shellState.env['USER'] || 'user';
+      const isRoot = tab.shellState.isRoot || user === 'root';
+      const promptChar = isRoot ? '#' : '$';
+      const home = tab.shellState.env['HOME'] || '/home/user';
+      const displayCwd = tab.shellState.cwd === home ? '~' : tab.shellState.cwd.replace(home, '~');
+      const gitInfo = getGitBranchInfo(tab.shellState.cwd, vfs);
+      const gitBadge = gitInfo ? ` <span style="color:#a78bfa;font-weight:bold">(${gitInfo.branch}${gitInfo.isDirty ? '*' : ''})</span>` : '';
+      prompt = `<span style="color:#4ade80;font-weight:bold">${user}@linux-box</span>:<span style="color:#60a5fa;font-weight:bold">${displayCwd}</span>${gitBadge}${promptChar} ${cmd.replace(/</g, '&lt;').replace(/>/g, '&gt;')}`;
+    }
 
     // Add input line
     addLine('input', prompt, true);
@@ -155,6 +170,9 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
       },
       setNanoState: (state: NanoState | null) => {
         setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, nanoState: state } : t));
+      },
+      setVimState: (state: VimState | null) => {
+        setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, vimState: state } : t));
       },
     };
 
@@ -314,6 +332,49 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
     }));
   }, [activeTabId, vfs]);
 
+  // Vim operations
+  const getVimState = useCallback((): VimState | null => {
+    const tab = tabs.find(t => t.id === activeTabId);
+    return tab?.vimState ?? null;
+  }, [tabs, activeTabId]);
+
+  const setVimState = useCallback((state: VimState | null) => {
+    setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, vimState: state } : t));
+  }, [activeTabId]);
+
+  const saveVim = useCallback((newContent: string) => {
+    const tab = tabs.find(t => t.id === activeTabId);
+    if (!tab?.vimState) return;
+    vfs.writeFile(tab.vimState.filename, newContent);
+    setTabs(prev => prev.map(t => t.id === activeTabId ? {
+      ...t,
+      vimState: t.vimState ? { ...t.vimState, content: newContent, modified: false } : null,
+    } : t));
+    refreshVFS();
+  }, [tabs, activeTabId, vfs, refreshVFS]);
+
+  const exitVim = useCallback(() => {
+    setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, vimState: null } : t));
+  }, [activeTabId]);
+
+  const openInVim = useCallback((filePath: string) => {
+    const node = vfs.getNode(filePath, true);
+    setTabs(prev => prev.map(t => {
+      if (t.id !== activeTabId) return t;
+      return {
+        ...t,
+        vimState: {
+          filename: filePath,
+          content: node?.content ?? '',
+          mode: 'NORMAL',
+          cursorLine: 0,
+          cursorCol: 0,
+          modified: false,
+        },
+      };
+    }));
+  }, [activeTabId, vfs]);
+
   const activeTab = getActiveTab();
 
   return {
@@ -332,8 +393,13 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
     setNanoState,
     saveNano,
     exitNano,
+    getVimState,
+    setVimState,
+    saveVim,
+    exitVim,
     changeDirectory,
     openInNano,
+    openInVim,
     shellState: activeTab?.shellState ?? createShellState(),
     isRunning: activeTab?.isRunning ?? false,
   };

@@ -2,15 +2,17 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { TopBar } from './TopBar';
 import { TerminalWindow } from './TerminalWindow';
 import { FileExplorerGUI } from './FileExplorerGUI';
+import { SystemMonitorGUI } from './SystemMonitorGUI';
 import { MissionSidebar } from './MissionSidebar';
 import { CheatSheetModal } from './CheatSheetModal';
 import { useVFS } from '../hooks/useVFS';
 import { useTerminal } from '../hooks/useTerminal';
 import { useShellInit } from '../hooks/useShell';
+import { useCronDaemon } from '../hooks/useCronDaemon';
 import { missions as defaultMissions } from '../data/missions';
 import { registry } from '../shell/commandRegistry';
 import type { Mission } from '../types';
-import { FolderTree, Sparkles, Trophy, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { FolderTree, Sparkles, Trophy, PanelRightClose, PanelRightOpen, Activity } from 'lucide-react';
 
 const MISSIONS_STORAGE_KEY = 'linux-sim-missions';
 
@@ -18,8 +20,10 @@ export const DesktopLayout: React.FC = () => {
   useShellInit();
   const { vfs, version, resetFileSystem, refresh } = useVFS();
   const terminal = useTerminal(vfs, refresh);
+  useCronDaemon(vfs, refresh);
 
   const [isFileExplorerOpen, setIsFileExplorerOpen] = useState(true);
+  const [isSystemMonitorOpen, setIsSystemMonitorOpen] = useState(false);
   const [isMissionSidebarOpen, setIsMissionSidebarOpen] = useState(false);
   const [isCheatSheetOpen, setIsCheatSheetOpen] = useState(false);
   const [celebrationToast, setCelebrationToast] = useState<string | null>(null);
@@ -154,10 +158,23 @@ export const DesktopLayout: React.FC = () => {
       {/* Top Status Bar */}
       <TopBar
         cwd={terminal.shellState.cwd}
+        currentUser={
+          terminal.shellState.remoteSession
+            ? `${terminal.shellState.remoteSession.user}@${terminal.shellState.remoteSession.hostname}`
+            : `${terminal.shellState.env['USER'] || 'user'}@linux-box`
+        }
         onReset={handleResetAll}
         onOpenCheatSheet={() => setIsCheatSheetOpen(true)}
         onExportVFS={handleExportVFS}
         onImportVFS={handleImportVFS}
+        onToggleSystemMonitor={() => {
+          setIsSystemMonitorOpen((prev) => {
+            const next = !prev;
+            if (next) setIsFileExplorerOpen(false);
+            return next;
+          });
+        }}
+        isSystemMonitorOpen={isSystemMonitorOpen}
       />
 
       {/* Main Workspace */}
@@ -191,8 +208,12 @@ export const DesktopLayout: React.FC = () => {
                 terminal.setNanoState({ ...state, content: c, modified: true });
               }
             }}
+            vimState={terminal.getVimState()}
+            onVimSave={terminal.saveVim}
+            onVimExit={terminal.exitVim}
             shellState={terminal.shellState}
             isRunning={terminal.isRunning}
+            vfs={vfs}
           />
 
           {/* Bottom Dock / Fast Access buttons */}
@@ -211,8 +232,37 @@ export const DesktopLayout: React.FC = () => {
             )}
 
             <button
-              onClick={() => setIsFileExplorerOpen((prev) => !prev)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1a1d2e]/90 hover:bg-[#23273e] text-xs font-medium text-blue-400 border border-blue-500/20 backdrop-blur-md shadow-xl transition-all hover:scale-105"
+              onClick={() => {
+                setIsSystemMonitorOpen((prev) => {
+                  const next = !prev;
+                  if (next) setIsFileExplorerOpen(false);
+                  return next;
+                });
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border backdrop-blur-md shadow-xl transition-all hover:scale-105 ${
+                isSystemMonitorOpen
+                  ? 'bg-emerald-500/25 text-emerald-300 border-emerald-500/40 shadow-emerald-950/40'
+                  : 'bg-[#1a1d2e]/90 hover:bg-[#23273e] text-emerald-400 border-emerald-500/20'
+              }`}
+              title={isSystemMonitorOpen ? 'Hide System Monitor' : 'Show System Monitor'}
+            >
+              <Activity size={14} />
+              <span>Monitor</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setIsFileExplorerOpen((prev) => {
+                  const next = !prev;
+                  if (next) setIsSystemMonitorOpen(false);
+                  return next;
+                });
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border backdrop-blur-md shadow-xl transition-all hover:scale-105 ${
+                isFileExplorerOpen
+                  ? 'bg-blue-500/25 text-blue-300 border-blue-500/40'
+                  : 'bg-[#1a1d2e]/90 hover:bg-[#23273e] text-blue-400 border-blue-500/20'
+              }`}
               title={isFileExplorerOpen ? 'Hide File Explorer' : 'Show File Explorer'}
             >
               <FolderTree size={14} />
@@ -222,17 +272,24 @@ export const DesktopLayout: React.FC = () => {
           </div>
         </main>
 
-        {/* Right Split Panel: Synchronized File Explorer */}
-        {isFileExplorerOpen && (
+        {/* Right Split Panel: Synchronized File Explorer or System Monitor */}
+        {(isFileExplorerOpen || isSystemMonitorOpen) && (
           <aside className="w-80 sm:w-96 h-full flex flex-col shrink-0 relative transition-all duration-300">
-            <FileExplorerGUI
-              vfs={vfs}
-              version={version}
-              cwd={terminal.shellState.cwd}
-              onNavigate={handleExplorerNavigate}
-              onOpenNano={(path) => terminal.openInNano(path)}
-              onRefresh={refresh}
-            />
+            {isSystemMonitorOpen ? (
+              <SystemMonitorGUI
+                onClose={() => setIsSystemMonitorOpen(false)}
+                onRefreshVFS={refresh}
+              />
+            ) : (
+              <FileExplorerGUI
+                vfs={vfs}
+                version={version}
+                cwd={terminal.shellState.cwd}
+                onNavigate={handleExplorerNavigate}
+                onOpenNano={(path) => terminal.openInNano(path)}
+                onRefresh={refresh}
+              />
+            )}
           </aside>
         )}
       </div>

@@ -1,7 +1,8 @@
 import { registry } from '../commandRegistry';
 import { resolvePath } from '../../vfs/pathResolver';
 import { checkPermission } from '../../vfs/permissions';
-import type { ShellState } from '../../types';
+import type { ShellState, CommandResult } from '../../types';
+import type { VirtualFileSystem } from '../../vfs/fileSystem';
 
 function resolve(p: string, s: ShellState): string {
   return resolvePath(p, s.cwd, s.env['HOME'] || '/home/user');
@@ -480,5 +481,60 @@ export function registerTextCommands() {
 
       return { stdout: '', stderr: '', exitCode: 0 };
     },
+  });
+
+  // vim and vi
+  const vimHandler = (
+    args: string[],
+    _flags: Record<string, string | boolean>,
+    shellState: ShellState,
+    vfs: VirtualFileSystem,
+    _stdin?: string,
+    context?: any
+  ): CommandResult => {
+    if (!context) return { stdout: '', stderr: 'vim: no context', exitCode: 1 };
+    if (args.length === 0) {
+      return { stdout: '', stderr: 'vim: missing filename', exitCode: 1 };
+    }
+
+    const path = resolve(args[0], shellState);
+    const node = vfs.getNode(path);
+    let content = '';
+
+    if (node) {
+      if (node.type === 'dir') {
+        return { stdout: '', stderr: `vim: ${args[0]}: Is a directory`, exitCode: 1 };
+      }
+      content = node.content ?? '';
+    }
+
+    if (context.setVimState) {
+      context.setVimState({
+        filename: path,
+        content,
+        mode: 'NORMAL',
+        cursorLine: 0,
+        cursorCol: 0,
+        modified: false,
+      });
+    }
+
+    return { stdout: '', stderr: '', exitCode: 0 };
+  };
+
+  registry.register({
+    name: 'vim',
+    description: 'Vi IMproved - powerful modal text editor',
+    usage: 'vim <filename>',
+    flags: [],
+    handler: vimHandler,
+  });
+
+  registry.register({
+    name: 'vi',
+    description: 'Vi modal text editor',
+    usage: 'vi <filename>',
+    flags: [],
+    handler: vimHandler,
   });
 }

@@ -183,16 +183,17 @@ export function checkPermission(
   action: 'read' | 'write' | 'execute',
   currentUser: string,
   isRoot: boolean,
+  userGroups?: string[],
 ): boolean {
   // Root can do anything
-  if (isRoot) return true;
+  if (isRoot || currentUser === 'root') return true;
 
   const parsed = parsePermissions(node.permissions);
 
   let perm: PermissionSet;
   if (node.owner === currentUser) {
     perm = parsed.owner;
-  } else if (node.group === currentUser) {
+  } else if (node.group === currentUser || (userGroups && userGroups.includes(node.group))) {
     perm = parsed.group;
   } else {
     perm = parsed.other;

@@ -1,7 +1,10 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { Plus, X } from 'lucide-react';
-import type { TerminalTab, ShellState, NanoState } from '../types';
+import type { TerminalTab, ShellState, NanoState, VimState } from '../types';
+import type { VirtualFileSystem } from '../vfs/fileSystem';
 import { NanoEditor } from './NanoEditor';
+import { VimEditor } from './VimEditor';
+import { getGitBranchInfo } from '../shell/commands/git';
 
 interface TerminalWindowProps {
   tabs: TerminalTab[];
@@ -17,8 +20,12 @@ interface TerminalWindowProps {
   onNanoSave: () => void;
   onNanoExit: () => void;
   onNanoContentChange: (content: string) => void;
+  vimState?: VimState | null;
+  onVimSave?: (newContent: string) => void;
+  onVimExit?: () => void;
   shellState: ShellState;
   isRunning: boolean;
+  vfs?: VirtualFileSystem;
 }
 
 export const TerminalWindow: React.FC<TerminalWindowProps> = ({
@@ -35,8 +42,12 @@ export const TerminalWindow: React.FC<TerminalWindowProps> = ({
   onNanoSave,
   onNanoExit,
   onNanoContentChange,
+  vimState,
+  onVimSave,
+  onVimExit,
   shellState,
   isRunning,
+  vfs,
 }) => {
   const outputRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -52,10 +63,10 @@ export const TerminalWindow: React.FC<TerminalWindowProps> = ({
 
   // Focus input on click
   const focusInput = useCallback(() => {
-    if (inputRef.current && !nanoState) {
+    if (inputRef.current && !nanoState && !vimState) {
       inputRef.current.focus();
     }
-  }, [nanoState]);
+  }, [nanoState, vimState]);
 
   // Auto-focus on mount and tab switch
   useEffect(() => {
@@ -88,6 +99,33 @@ export const TerminalWindow: React.FC<TerminalWindowProps> = ({
         />
       </div>
     );
+  }
+
+  if (vimState) {
+    return (
+      <div className="flex flex-col h-full" style={{ background: '#0f111a' }}>
+        <VimEditor
+          filename={vimState.filename}
+          content={vimState.content}
+          onSave={(c) => onVimSave?.(c)}
+          onExit={() => onVimExit?.()}
+        />
+      </div>
+    );
+  }
+
+  // Calculate prompt details
+  let promptHtml = '';
+  if (shellState.remoteSession) {
+    const s = shellState.remoteSession;
+    promptHtml = `<span style="color:#4ade80;font-weight:bold">${s.user}@${s.hostname}</span>:<span style="color:#60a5fa;font-weight:bold">${s.cwd}</span>$ `;
+  } else {
+    const user = shellState.env['USER'] || 'user';
+    const isRoot = shellState.isRoot || user === 'root';
+    const promptChar = isRoot ? '#' : '$';
+    const gitInfo = vfs ? getGitBranchInfo(shellState.cwd, vfs) : null;
+    const gitBadge = gitInfo ? ` <span style="color:#a78bfa;font-weight:bold">(${gitInfo.branch}${gitInfo.isDirty ? '*' : ''})</span>` : '';
+    promptHtml = `<span style="color:#4ade80;font-weight:bold">${user}@linux-box</span>:<span style="color:#60a5fa;font-weight:bold">${displayCwd}</span>${gitBadge}${promptChar} `;
   }
 
   return (
@@ -161,7 +199,7 @@ export const TerminalWindow: React.FC<TerminalWindowProps> = ({
           <div className="flex items-center min-h-[1.3em]">
             <span
               dangerouslySetInnerHTML={{
-                __html: `<span style="color:#4ade80;font-weight:bold">${shellState.env['USER'] || 'user'}@linux-box</span>:<span style="color:#60a5fa;font-weight:bold">${displayCwd}</span>$ `,
+                __html: promptHtml,
               }}
             />
             <div className="relative flex-1">

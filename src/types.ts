@@ -60,6 +60,8 @@ export interface ShellState {
   lastExitCode: number;
   previousDir: string;
   isRoot: boolean; // sudo mode
+  userStack?: { user: string; home: string; isRoot: boolean }[];
+  remoteSession?: { host: string; hostname: string; user: string; cwd: string } | null;
 }
 
 export interface TerminalLine {
@@ -77,6 +79,7 @@ export interface TerminalTab {
   shellState: ShellState;
   isRunning: boolean; // for async commands like ping
   nanoState?: NanoState | null;
+  vimState?: VimState | null;
 }
 
 export interface NanoState {
@@ -88,11 +91,20 @@ export interface NanoState {
   scrollOffset: number;
 }
 
+export interface VimState {
+  filename: string;
+  content: string;
+  mode?: 'NORMAL' | 'INSERT' | 'VISUAL' | 'COMMAND';
+  cursorLine?: number;
+  cursorCol?: number;
+  modified?: boolean;
+}
+
 export interface Mission {
   id: string;
   title: string;
   description: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  difficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'master';
   hint: string;
   validator: (vfs: any, history: string[]) => boolean;
   completed: boolean;

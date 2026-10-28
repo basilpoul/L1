@@ -1,4 +1,5 @@
 import { registry } from '../commandRegistry';
+import type { ShellState, CommandResult } from '../../types';
 
 export function registerUtilityCommands() {
   // history
@@ -22,6 +23,38 @@ export function registerUtilityCommands() {
     usage: 'clear',
     flags: [],
     handler: () => ({ stdout: '__CLEAR__', stderr: '', exitCode: 0 }),
+  });
+
+  // exit and logout
+  const exitHandler = (_args: string[], _flags: Record<string, string | boolean>, shellState: ShellState): CommandResult => {
+    if (shellState.remoteSession) {
+      shellState.remoteSession = null;
+      return { stdout: 'Connection to 10.0.0.5 closed.', stderr: '', exitCode: 0 };
+    }
+    if (shellState.userStack && shellState.userStack.length > 0) {
+      const prev = shellState.userStack.pop()!;
+      shellState.env['USER'] = prev.user;
+      shellState.env['HOME'] = prev.home;
+      shellState.isRoot = prev.isRoot;
+      return { stdout: 'exit', stderr: '', exitCode: 0 };
+    }
+    return { stdout: 'logout', stderr: '', exitCode: 0 };
+  };
+
+  registry.register({
+    name: 'exit',
+    description: 'Cause the shell to exit or return from su/ssh session',
+    usage: 'exit',
+    flags: [],
+    handler: exitHandler,
+  });
+
+  registry.register({
+    name: 'logout',
+    description: 'Exit a login shell',
+    usage: 'logout',
+    flags: [],
+    handler: exitHandler,
   });
 
   // bash

@@ -24,7 +24,7 @@ export const MissionSidebar: React.FC<MissionSidebarProps> = ({
   isOpen,
   onToggle,
 }) => {
-  const [filter, setFilter] = useState<'all' | 'beginner' | 'intermediate' | 'advanced' | 'expert'>('all');
+  const [filter, setFilter] = useState<'all' | 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'master'>('all');
   const [expandedHints, setExpandedHints] = useState<Record<string, boolean>>({});
 
   const completedCount = missions.filter((m) => m.completed).length;
@@ -50,6 +50,8 @@ export const MissionSidebar: React.FC<MissionSidebarProps> = ({
         return 'text-rose-400 bg-rose-500/10 border-rose-500/20';
       case 'expert':
         return 'text-purple-400 bg-purple-500/10 border-purple-500/20';
+      case 'master':
+        return 'text-violet-400 bg-violet-500/10 border-violet-500/20';
     }
   };
 
@@ -107,12 +109,12 @@ export const MissionSidebar: React.FC<MissionSidebarProps> = ({
             </div>
 
             {/* Difficulty Tabs */}
-            <div className="flex gap-1 mt-3 p-0.5 bg-black/20 rounded-lg border border-white/5 text-[11px]">
-              {(['all', 'beginner', 'intermediate', 'advanced', 'expert'] as const).map((tab) => (
+            <div className="flex gap-1 mt-3 p-0.5 bg-black/20 rounded-lg border border-white/5 text-[11px] overflow-x-auto">
+              {(['all', 'beginner', 'intermediate', 'advanced', 'expert', 'master'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setFilter(tab)}
-                  className={`flex-1 py-1 rounded capitalize transition-all ${
+                  className={`flex-1 py-1 px-1 rounded capitalize transition-all whitespace-nowrap ${
                     filter === tab
                       ? 'bg-blue-600/30 text-blue-400 font-medium shadow-sm'
                       : 'text-slate-400 hover:text-slate-300'

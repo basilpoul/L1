@@ -7,6 +7,9 @@ import { registerUtilityCommands } from './utility';
 import { registerAdvancedTextCommands } from './advancedText';
 import { registerArchiveCommands } from './archives';
 import { registerSysadminCommands } from './sysadmin';
+import { registerGitCommands } from './git';
+import { registerDockerCommands } from './docker';
+import { registerSecurityCommands } from './security';
 
 let registered = false;
 
@@ -22,4 +25,7 @@ export function registerAllCommands() {
   registerAdvancedTextCommands();
   registerArchiveCommands();
   registerSysadminCommands();
+  registerGitCommands();
+  registerDockerCommands();
+  registerSecurityCommands();
 }

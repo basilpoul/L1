@@ -22,6 +22,7 @@ export interface ExecutionContext {
   setRunning: (running: boolean) => void;
   onCtrlC: (handler: () => void) => void;
   setNanoState: (state: any) => void;
+  setVimState?: (state: any) => void;
 }
 
 /**
