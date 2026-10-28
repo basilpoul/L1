@@ -1,0 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #0f111a;
+  --bg-secondary: #1a1d2e;
+  --bg-tertiary: #232636;
+  --bg-glass: rgba(26, 29, 46, 0.85);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent-blue: #60a5fa;
+  --accent-green: #4ade80;
+  --accent-red: #f87171;
+  --accent-yellow: #fbbf24;
+  --accent-purple: #c084fc;
+  --accent-cyan: #22d3ee;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.25);
+}
+
+/* Terminal cursor blink */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.cursor-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* Selection styling */
+::selection {
+  background: rgba(96, 165, 250, 0.3);
+}
+
+/* Glass effect */
+.glass {
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+}
