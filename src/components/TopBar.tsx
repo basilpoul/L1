@@ -10,6 +10,10 @@ import {
   Activity,
   Flame,
   Palette,
+  Network,
+  Search,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import type { TerminalTheme } from '../types';
 import { THEMES } from '../styles/themes';
@@ -23,6 +27,11 @@ interface TopBarProps {
   onImportVFS?: (jsonString: string) => void;
   onToggleSystemMonitor?: () => void;
   isSystemMonitorOpen?: boolean;
+  onToggleTopology?: () => void;
+  isTopologyOpen?: boolean;
+  onOpenCommandPalette?: () => void;
+  onToggleSound?: () => void;
+  isSoundMuted?: boolean;
   theme?: TerminalTheme;
   onThemeChange?: (theme: TerminalTheme) => void;
   onOpenIncidents?: () => void;
@@ -38,6 +47,11 @@ export const TopBar: React.FC<TopBarProps> = ({
   onImportVFS,
   onToggleSystemMonitor,
   isSystemMonitorOpen,
+  onToggleTopology,
+  isTopologyOpen,
+  onOpenCommandPalette,
+  onToggleSound,
+  isSoundMuted = false,
   theme = 'slate',
   onThemeChange,
   onOpenIncidents,
@@ -134,6 +148,37 @@ export const TopBar: React.FC<TopBarProps> = ({
           </div>
         )}
 
+        {/* Command Palette Trigger */}
+        {onOpenCommandPalette && (
+          <button
+            onClick={onOpenCommandPalette}
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/5 transition-colors"
+            title="Command Palette (Ctrl+K)"
+          >
+            <Search size={12} className="text-slate-400" />
+            <span className="hidden sm:inline">Search</span>
+            <kbd className="hidden md:inline px-1 py-0.2 text-[9px] font-mono rounded bg-black/40 border border-white/10 text-slate-400">
+              Ctrl+K
+            </kbd>
+          </button>
+        )}
+
+        {/* Topology Map Toggle */}
+        {onToggleTopology && (
+          <button
+            onClick={onToggleTopology}
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs transition-colors border ${
+              isTopologyOpen
+                ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                : 'text-slate-400 hover:text-white hover:bg-white/5 border-white/5'
+            }`}
+            title="Toggle Network & Cluster Topology Map"
+          >
+            <Network size={12} className={isTopologyOpen ? 'text-blue-400' : 'text-slate-400'} />
+            <span className="hidden sm:inline">Topology</span>
+          </button>
+        )}
+
         {/* System Monitor Toggle */}
         {onToggleSystemMonitor && (
           <button
@@ -147,6 +192,21 @@ export const TopBar: React.FC<TopBarProps> = ({
           >
             <Activity size={12} className={isSystemMonitorOpen ? 'text-emerald-400 animate-pulse' : 'text-slate-400'} />
             <span className="hidden sm:inline">Monitor</span>
+          </button>
+        )}
+
+        {/* Audio Sound Toggle */}
+        {onToggleSound && (
+          <button
+            onClick={onToggleSound}
+            className={`p-1 rounded text-xs transition-colors border ${
+              !isSoundMuted
+                ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/20'
+                : 'text-slate-500 hover:text-slate-300 border-white/5 hover:bg-white/5'
+            }`}
+            title={isSoundMuted ? 'Unmute Terminal SFX' : 'Mute Terminal SFX'}
+          >
+            {!isSoundMuted ? <Volume2 size={13} /> : <VolumeX size={13} />}
           </button>
         )}
 

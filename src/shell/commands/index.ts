@@ -13,6 +13,9 @@ import { registerSecurityCommands } from './security';
 import { registerNetworkCryptoCommands } from './networkCrypto';
 import { registerRuntimeCommands } from './runtimes';
 import { registerJobControlCommands } from './jobControl';
+import { registerOrchestrationCommands } from './orchestration';
+import { registerKernelStorageCommands } from './kernelStorage';
+import { registerRecorderCommands } from './recorder';
 
 let registered = false;
 
@@ -34,4 +37,7 @@ export function registerAllCommands() {
   registerNetworkCryptoCommands();
   registerRuntimeCommands();
   registerJobControlCommands();
+  registerOrchestrationCommands();
+  registerKernelStorageCommands();
+  registerRecorderCommands();
 }

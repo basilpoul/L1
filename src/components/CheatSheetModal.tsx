@@ -37,6 +37,9 @@ export const CheatSheetModal: React.FC<CheatSheetModalProps> = ({
   };
 
   const categorize = (name: string): string => {
+    const k8sCompose = ['kubectl', 'docker-compose'];
+    const storageKernel = ['lsblk', 'mount', 'umount', 'fdisk', 'journalctl', 'dmesg', 'sysctl'];
+    const recorder = ['script', 'replay'];
     const runtimes = ['python3', 'python', 'node', 'sqlite3'];
     const dnsCrypto = ['ip', 'dig', 'nslookup', 'traceroute', 'base64', 'sha256sum', 'md5sum', 'openssl', 'ssh-keygen', 'ssh-copy-id'];
     const multiplexJobs = ['tmux', 'watch', 'jobs', 'fg', 'bg', 'sleep', 'nohup'];
@@ -54,6 +57,9 @@ export const CheatSheetModal: React.FC<CheatSheetModalProps> = ({
     const sys = ['neofetch', 'uname', 'hostname', 'date', 'uptime', 'cal', 'df', 'du', 'free', 'ps', 'top', 'htop', 'kill', 'ping'];
     const script = ['bash', 'sh'];
 
+    if (k8sCompose.includes(name)) return 'Kubernetes & Compose';
+    if (storageKernel.includes(name)) return 'Storage & Kernel';
+    if (recorder.includes(name)) return 'Session Recording';
     if (runtimes.includes(name)) return 'Runtimes & SQL';
     if (dnsCrypto.includes(name)) return 'DNS & Cryptography';
     if (multiplexJobs.includes(name)) return 'Multiplexing & Jobs';
@@ -75,6 +81,9 @@ export const CheatSheetModal: React.FC<CheatSheetModalProps> = ({
 
   const categories = [
     'all',
+    'Kubernetes & Compose',
+    'Storage & Kernel',
+    'Session Recording',
     'Multiplexing & Jobs',
     'Runtimes & SQL',
     'DNS & Cryptography',

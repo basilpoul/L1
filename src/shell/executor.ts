@@ -9,6 +9,7 @@ import type { ExecutionContext } from './commandRegistry';
 import type { Pipeline, PipelineStage } from './parser';
 import { executeScriptFile } from './scriptRunner';
 import { REMOTE_PROD_FILES } from './commands/security';
+import { isRecordingSession, recordSessionEvent } from './commands/recorder';
 
 /**
  * Expand aliases in the input string.
@@ -370,6 +371,11 @@ export async function executeCommand(
     return { stdout: `[${jobId}] ${pid}`, stderr: '', exitCode: 0 };
   }
 
+  // Record command event if session recorder is active
+  if (isRecordingSession() && !trimmed.startsWith('script')) {
+    recordSessionEvent('command', trimmed);
+  }
+
   // Handle remote interactive session
   if (shellState.remoteSession) {
     if (trimmed === 'exit' || trimmed === 'logout') {
@@ -483,6 +489,11 @@ export async function executeCommand(
 
   // Step 6: Update exit code
   shellState.lastExitCode = lastResult.exitCode;
+
+  if (isRecordingSession() && !trimmed.startsWith('script')) {
+    if (lastResult.stdout) recordSessionEvent('output', lastResult.stdout);
+    if (lastResult.stderr) recordSessionEvent('error', lastResult.stderr);
+  }
 
   return lastResult;
 }

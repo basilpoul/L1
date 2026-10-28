@@ -128,6 +128,53 @@ export function createInitialFileSystem(): VFSNode {
     ),
   ]);
 
+  // /home/user/projects/k8s
+  const k8sDir = dir('k8s', [
+    file(
+      'deployment.yaml',
+      `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp
+  labels:
+    app: webapp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: webapp
+  template:
+    metadata:
+      labels:
+        app: webapp
+    spec:
+      containers:
+      - name: webapp
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+`,
+      'rw-r--r--',
+    ),
+    file(
+      'service.yaml',
+      `apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-service
+spec:
+  type: NodePort
+  selector:
+    app: webapp
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30080
+`,
+      'rw-r--r--',
+    ),
+  ]);
+
   // /home/user/projects
   const projects = dir('projects', [
     file(
@@ -139,6 +186,26 @@ export function createInitialFileSystem(): VFSNode {
       'config.json',
       '{\n  "app_name": "linux-sim",\n  "version": "1.0.0",\n  "port": 3000,\n  "database": {\n    "host": "localhost",\n    "port": 5432,\n    "name": "myapp_db"\n  },\n  "debug": false\n}\n',
     ),
+    file(
+      'docker-compose.yml',
+      `version: '3.8'
+
+services:
+  web:
+    image: nginx:latest
+    ports:
+      - "8080:80"
+    restart: always
+
+  cache:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    restart: always
+`,
+      'rw-r--r--',
+    ),
+    k8sDir,
   ]);
 
   // /home/user/Downloads
@@ -183,6 +250,13 @@ export function createInitialFileSystem(): VFSNode {
       file(
         'os-release',
         'NAME="LinuxSim OS"\nVERSION="24.04 LTS"\nID=linuxsim\nPRETTY_NAME="LinuxSim OS 24.04 LTS"\nVERSION_ID="24.04"\nHOME_URL="https://linuxsim.dev"\n',
+        'rw-r--r--',
+        'root',
+        'root',
+      ),
+      file(
+        'sysctl.conf',
+        '# /etc/sysctl.conf - Configuration file for setting system-variables\nnet.ipv4.ip_forward = 0\nvm.swappiness = 60\nkernel.randomize_va_space = 2\nnet.ipv4.tcp_syncookies = 1\n',
         'rw-r--r--',
         'root',
         'root',
@@ -284,11 +358,25 @@ export function createInitialFileSystem(): VFSNode {
       binFile('node'),
       binFile('sqlite3'),
       binFile('tmux'),
+      binFile('kubectl'),
+      binFile('docker-compose'),
+      binFile('lsblk'),
+      binFile('mount'),
+      binFile('umount'),
+      binFile('fdisk'),
+      binFile('journalctl'),
+      binFile('dmesg'),
+      binFile('sysctl'),
+      binFile('script'),
+      binFile('replay'),
     ],
     'rwxr-xr-x',
     'root',
     'root',
   );
+
+  // /mnt
+  const mntDir = dir('mnt', [], 'rwxr-xr-x', 'root', 'root');
 
   // /tmp
   const tmpDir = dir(
@@ -313,7 +401,7 @@ export function createInitialFileSystem(): VFSNode {
   // / (root directory)
   const root = dir(
     '/',
-    [home, etc, varDir, binDir, tmpDir, rootHome],
+    [home, etc, varDir, binDir, mntDir, tmpDir, rootHome],
     'rwxr-xr-x',
     'root',
     'root',

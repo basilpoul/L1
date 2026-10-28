@@ -79,7 +79,7 @@ class MockVimSession {
     this.undoStack.push([...this.lines]);
   }
 
-  pressKey(key, extra = {}) {
+  pressKey(key, _extra = {}) {
     if (this.mode === 'COMMAND') {
       if (key === 'Escape') {
         this.mode = 'NORMAL';

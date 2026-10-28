@@ -3,9 +3,14 @@ import { TopBar } from './TopBar';
 import { TerminalWindow } from './TerminalWindow';
 import { FileExplorerGUI } from './FileExplorerGUI';
 import { SystemMonitorGUI } from './SystemMonitorGUI';
+import { NetworkTopologyGUI } from './NetworkTopologyGUI';
 import { MissionSidebar } from './MissionSidebar';
 import { CheatSheetModal } from './CheatSheetModal';
 import { IncidentModal } from './IncidentModal';
+import { LabBuilderModal } from './LabBuilderModal';
+import { getCustomMissions, convertCustomMissionToMission } from '../utils/customMissions';
+import { CommandPalette } from './CommandPalette';
+import { soundEngine } from '../utils/soundEngine';
 import { useVFS } from '../hooks/useVFS';
 import { useTerminal } from '../hooks/useTerminal';
 import { useShellInit } from '../hooks/useShell';
@@ -13,7 +18,7 @@ import { useCronDaemon } from '../hooks/useCronDaemon';
 import { missions as defaultMissions } from '../data/missions';
 import { registry } from '../shell/commandRegistry';
 import type { Mission, TerminalTheme } from '../types';
-import { FolderTree, Sparkles, Trophy, PanelRightClose, PanelRightOpen, Activity } from 'lucide-react';
+import { FolderTree, Sparkles, Trophy, PanelRightClose, PanelRightOpen, Activity, Network } from 'lucide-react';
 
 const MISSIONS_STORAGE_KEY = 'linux-sim-missions';
 
@@ -25,30 +30,50 @@ export const DesktopLayout: React.FC = () => {
 
   const [isFileExplorerOpen, setIsFileExplorerOpen] = useState(true);
   const [isSystemMonitorOpen, setIsSystemMonitorOpen] = useState(false);
+  const [isTopologyOpen, setIsTopologyOpen] = useState(false);
   const [isMissionSidebarOpen, setIsMissionSidebarOpen] = useState(false);
   const [isCheatSheetOpen, setIsCheatSheetOpen] = useState(false);
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
+  const [isLabBuilderOpen, setIsLabBuilderOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isSoundMuted, setIsSoundMuted] = useState(() => soundEngine.isMuted());
   const [celebrationToast, setCelebrationToast] = useState<string | null>(null);
   const [theme, setTheme] = useState<TerminalTheme>(
     () => (localStorage.getItem('linuxsim_theme') as TerminalTheme) || 'slate'
   );
 
-  // Load missions from localStorage or use defaults
-  const [missionsList, setMissionsList] = useState<Mission[]>(() => {
+  const loadAllMissions = useCallback((): Mission[] => {
     try {
       const saved = localStorage.getItem(MISSIONS_STORAGE_KEY);
-      if (saved) {
-        const savedCompleted: string[] = JSON.parse(saved);
-        return defaultMissions.map((m) => ({
-          ...m,
-          completed: savedCompleted.includes(m.id),
-        }));
-      }
+      const savedCompleted: string[] = saved ? JSON.parse(saved) : [];
+      const customList = getCustomMissions().map((cm) =>
+        convertCustomMissionToMission(cm, savedCompleted.includes(cm.id))
+      );
+      const defaults = defaultMissions.map((m) => ({
+        ...m,
+        completed: savedCompleted.includes(m.id),
+      }));
+      return [...defaults, ...customList];
     } catch (e) {
       console.error('Failed to load saved missions', e);
+      return defaultMissions;
     }
-    return defaultMissions;
-  });
+  }, []);
+
+  // Load missions from localStorage or use defaults
+  const [missionsList, setMissionsList] = useState<Mission[]>(loadAllMissions);
+
+  // Global Ctrl+K listener for Command Palette
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
 
   // Save completed missions
   const saveMissionsState = (updated: Mission[]) => {
@@ -76,9 +101,11 @@ export const DesktopLayout: React.FC = () => {
         setMissionsList(updated);
         saveMissionsState(updated);
 
+        soundEngine.playSuccessChime();
         setCelebrationToast(`🎉 Completed: "${mission.title}"!`);
         setTimeout(() => setCelebrationToast(null), 4000);
       } else {
+        soundEngine.playBell();
         setCelebrationToast(`❌ Mission requirements not yet met. Check the hint!`);
         setTimeout(() => setCelebrationToast(null), 3000);
       }
@@ -108,6 +135,7 @@ export const DesktopLayout: React.FC = () => {
       if (stateChanged) {
         saveMissionsState(updated);
         if (newlyCompletedTitle) {
+          soundEngine.playSuccessChime();
           setCelebrationToast(`🎉 Completed: "${newlyCompletedTitle}"!`);
           setTimeout(() => setCelebrationToast(null), 4000);
         }
@@ -119,11 +147,16 @@ export const DesktopLayout: React.FC = () => {
 
   const handleResetAll = () => {
     resetFileSystem();
-    const resetList = defaultMissions.map((m) => ({ ...m, completed: false }));
+    const resetList = loadAllMissions().map((m) => ({ ...m, completed: false }));
     setMissionsList(resetList);
     localStorage.removeItem(MISSIONS_STORAGE_KEY);
     setCelebrationToast('🔄 File system and missions reset to defaults.');
     setTimeout(() => setCelebrationToast(null), 3000);
+  };
+
+  const handleToggleSound = () => {
+    const nextMuted = soundEngine.toggleMute();
+    setIsSoundMuted(nextMuted);
   };
 
   const handleExplorerNavigate = (path: string) => {
@@ -175,11 +208,28 @@ export const DesktopLayout: React.FC = () => {
         onToggleSystemMonitor={() => {
           setIsSystemMonitorOpen((prev) => {
             const next = !prev;
-            if (next) setIsFileExplorerOpen(false);
+            if (next) {
+              setIsFileExplorerOpen(false);
+              setIsTopologyOpen(false);
+            }
             return next;
           });
         }}
         isSystemMonitorOpen={isSystemMonitorOpen}
+        onToggleTopology={() => {
+          setIsTopologyOpen((prev) => {
+            const next = !prev;
+            if (next) {
+              setIsFileExplorerOpen(false);
+              setIsSystemMonitorOpen(false);
+            }
+            return next;
+          });
+        }}
+        isTopologyOpen={isTopologyOpen}
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+        onToggleSound={handleToggleSound}
+        isSoundMuted={isSoundMuted}
         theme={theme}
         onThemeChange={(t) => {
           setTheme(t);
@@ -196,6 +246,7 @@ export const DesktopLayout: React.FC = () => {
           onCheckMission={handleCheckMission}
           isOpen={isMissionSidebarOpen}
           onToggle={() => setIsMissionSidebarOpen((prev) => !prev)}
+          onOpenLabBuilder={() => setIsLabBuilderOpen(true)}
         />
 
         {/* Central Terminal Emulator */}
@@ -204,9 +255,17 @@ export const DesktopLayout: React.FC = () => {
             tabs={terminal.tabs}
             activeTabId={terminal.activeTabId}
             inputValue={terminal.inputValue}
-            onInput={terminal.handleInput}
+            onInput={(val) => {
+              soundEngine.playKeyTick();
+              terminal.handleInput(val);
+            }}
             onSubmit={terminal.handleSubmit}
-            onKeyDown={terminal.handleKeyDown}
+            onKeyDown={(e) => {
+              if (!e.ctrlKey && !e.altKey && !e.metaKey) {
+                soundEngine.playKeyTick();
+              }
+              terminal.handleKeyDown(e);
+            }}
             onAddTab={terminal.addTab}
             onCloseTab={terminal.closeTab}
             onSetActiveTab={terminal.switchTab}
@@ -249,9 +308,34 @@ export const DesktopLayout: React.FC = () => {
 
             <button
               onClick={() => {
+                setIsTopologyOpen((prev) => {
+                  const next = !prev;
+                  if (next) {
+                    setIsFileExplorerOpen(false);
+                    setIsSystemMonitorOpen(false);
+                  }
+                  return next;
+                });
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border backdrop-blur-md shadow-xl transition-all hover:scale-105 ${
+                isTopologyOpen
+                  ? 'bg-blue-500/25 text-blue-300 border-blue-500/40 shadow-blue-950/40'
+                  : 'bg-[#1a1d2e]/90 hover:bg-[#23273e] text-blue-400 border-blue-500/20'
+              }`}
+              title={isTopologyOpen ? 'Hide Network Topology' : 'Show Network Topology'}
+            >
+              <Network size={14} />
+              <span>Topology</span>
+            </button>
+
+            <button
+              onClick={() => {
                 setIsSystemMonitorOpen((prev) => {
                   const next = !prev;
-                  if (next) setIsFileExplorerOpen(false);
+                  if (next) {
+                    setIsFileExplorerOpen(false);
+                    setIsTopologyOpen(false);
+                  }
                   return next;
                 });
               }}
@@ -270,14 +354,17 @@ export const DesktopLayout: React.FC = () => {
               onClick={() => {
                 setIsFileExplorerOpen((prev) => {
                   const next = !prev;
-                  if (next) setIsSystemMonitorOpen(false);
+                  if (next) {
+                    setIsSystemMonitorOpen(false);
+                    setIsTopologyOpen(false);
+                  }
                   return next;
                 });
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border backdrop-blur-md shadow-xl transition-all hover:scale-105 ${
                 isFileExplorerOpen
-                  ? 'bg-blue-500/25 text-blue-300 border-blue-500/40'
-                  : 'bg-[#1a1d2e]/90 hover:bg-[#23273e] text-blue-400 border-blue-500/20'
+                  ? 'bg-indigo-500/25 text-indigo-300 border-indigo-500/40'
+                  : 'bg-[#1a1d2e]/90 hover:bg-[#23273e] text-indigo-400 border-indigo-500/20'
               }`}
               title={isFileExplorerOpen ? 'Hide File Explorer' : 'Show File Explorer'}
             >
@@ -288,10 +375,19 @@ export const DesktopLayout: React.FC = () => {
           </div>
         </main>
 
-        {/* Right Split Panel: Synchronized File Explorer or System Monitor */}
-        {(isFileExplorerOpen || isSystemMonitorOpen) && (
+        {/* Right Split Panel: Synchronized File Explorer, System Monitor, or Topology Map */}
+        {(isFileExplorerOpen || isSystemMonitorOpen || isTopologyOpen) && (
           <aside className="w-80 sm:w-96 h-full flex flex-col shrink-0 relative transition-all duration-300">
-            {isSystemMonitorOpen ? (
+            {isTopologyOpen ? (
+              <NetworkTopologyGUI
+                onClose={() => setIsTopologyOpen(false)}
+                onRunCommand={(cmd) => {
+                  terminal.handleInput(cmd);
+                  setTimeout(() => terminal.handleSubmit(), 50);
+                }}
+                vfs={vfs}
+              />
+            ) : isSystemMonitorOpen ? (
               <SystemMonitorGUI
                 onClose={() => setIsSystemMonitorOpen(false)}
                 onRefreshVFS={refresh}
@@ -326,6 +422,54 @@ export const DesktopLayout: React.FC = () => {
       />
 
       {/* Break-Fix Incident Simulator Modal */}
+      <IncidentModal
+        isOpen={isIncidentModalOpen}
+        onClose={() => setIsIncidentModalOpen(false)}
+        vfs={vfs}
+        onRefresh={refresh}
+        history={terminal.activeTab?.shellState.history || []}
+      />
+
+      {/* Command Palette Modal (Ctrl+K) */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onSplitHorizontal={() => terminal.splitTab('horizontal')}
+        onSplitVertical={() => terminal.splitTab('vertical')}
+        onToggleTopology={() => {
+          setIsTopologyOpen((prev) => !prev);
+          setIsFileExplorerOpen(false);
+          setIsSystemMonitorOpen(false);
+        }}
+        onToggleSystemMonitor={() => {
+          setIsSystemMonitorOpen((prev) => !prev);
+          setIsFileExplorerOpen(false);
+          setIsTopologyOpen(false);
+        }}
+        onToggleFileExplorer={() => {
+          setIsFileExplorerOpen((prev) => !prev);
+          setIsSystemMonitorOpen(false);
+          setIsTopologyOpen(false);
+        }}
+        onOpenIncidents={() => setIsIncidentModalOpen(true)}
+        onResetVFS={handleResetAll}
+        onToggleSound={handleToggleSound}
+        isSoundMuted={isSoundMuted}
+        onSelectMission={(id) => handleCheckMission(id)}
+        onSelectTheme={(t) => {
+          setTheme(t);
+          localStorage.setItem('linuxsim_theme', t);
+        }}
+        missions={missionsList}
+        currentTheme={theme}
+      />
+
+      {/* Custom Lab Builder Modal */}
+      <LabBuilderModal
+        isOpen={isLabBuilderOpen}
+        onClose={() => setIsLabBuilderOpen(false)}
+        onMissionsUpdated={() => setMissionsList(loadAllMissions())}
+      />
       <IncidentModal
         isOpen={isIncidentModalOpen}
         onClose={() => setIsIncidentModalOpen(false)}

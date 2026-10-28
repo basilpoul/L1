@@ -3,6 +3,8 @@ import type { VirtualFileSystem } from '../vfs/fileSystem';
 import { isServiceRunning } from '../shell/commands/sysadmin';
 import { getDockerState } from '../shell/commands/docker';
 import { getUfwState } from '../shell/commands/security';
+import { getStorageState } from '../shell/commands/kernelStorage';
+import { getK8sState } from '../shell/commands/orchestration';
 
 /**
  * 15 progressive missions that teach Linux fundamentals.
@@ -740,6 +742,174 @@ export const missions: Mission[] = [
         cmd.includes('systemctl restart') ||
         cmd.includes('crontab')
       );
+    },
+  },
+
+  // ── Tier 7: Cloud-Native & Kernel (46-55) ─────────────────────────
+
+  {
+    id: 'mission-46',
+    title: 'Block Device Discovery',
+    description:
+      'Inspect all attached block storage devices with `lsblk` and redirect the output to ~/disks.txt.',
+    difficulty: 'cloud-native',
+    hint: 'Run lsblk > ~/disks.txt or lsblk > /home/user/disks.txt',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const node = vfs.getNode('/home/user/disks.txt', true);
+      return !!node?.content && (node.content.includes('sda') || node.content.includes('sdb'));
+    },
+  },
+
+  {
+    id: 'mission-47',
+    title: 'Mounting External Storage',
+    description:
+      'Create the mount point /mnt/external and mount the secondary volume /dev/sdb1 using `sudo mount /dev/sdb1 /mnt/external`.',
+    difficulty: 'cloud-native',
+    hint: 'sudo mkdir -p /mnt/external && sudo mount /dev/sdb1 /mnt/external',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const storage = getStorageState();
+      const sdb1Mounted = storage.devices.some(
+        (d) => (d.name === 'sdb1' && d.mountpoint === '/mnt/external') ||
+               d.children?.some((c) => c.name === 'sdb1' && c.mountpoint === '/mnt/external')
+      );
+      const dirExists = !!vfs.getNode('/mnt/external', true);
+      return sdb1Mounted && dirExists;
+    },
+  },
+
+  {
+    id: 'mission-48',
+    title: 'Systemd Journal Auditing',
+    description:
+      'Use `journalctl -u nginx` to extract Nginx unit service logs and write them to ~/nginx_journal.log.',
+    difficulty: 'cloud-native',
+    hint: 'journalctl -u nginx > ~/nginx_journal.log',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const node = vfs.getNode('/home/user/nginx_journal.log', true);
+      return !!node?.content && (node.content.includes('nginx') || node.content.includes('systemd'));
+    },
+  },
+
+  {
+    id: 'mission-49',
+    title: 'Kernel Parameter Tuning',
+    description:
+      'Enable IPv4 packet forwarding in the kernel by running `sudo sysctl -w net.ipv4.ip_forward=1`.',
+    difficulty: 'cloud-native',
+    hint: 'sudo sysctl -w net.ipv4.ip_forward=1',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, history: string[]): boolean => {
+      const confNode = vfs.getNode('/etc/sysctl.conf', true);
+      const confHasIt = !!confNode?.content?.includes('net.ipv4.ip_forward = 1') ||
+                        !!confNode?.content?.includes('net.ipv4.ip_forward=1');
+      const inHistory = history.some((cmd) => cmd.includes('sysctl -w net.ipv4.ip_forward=1') || cmd.includes('net.ipv4.ip_forward = 1'));
+      return confHasIt || inHistory;
+    },
+  },
+
+  {
+    id: 'mission-50',
+    title: 'Docker Compose Stack',
+    description:
+      'Navigate to ~/projects and launch the multi-container web and cache stack using `docker-compose up -d`.',
+    difficulty: 'cloud-native',
+    hint: 'cd ~/projects && docker-compose up -d',
+    completed: false,
+    validator: (_vfs: VirtualFileSystem, history: string[]): boolean => {
+      const docker = getDockerState();
+      const hasComposeContainers = docker.containers.some(
+        (c) => c.name.includes('projects_web') || c.name.includes('projects_cache') || c.name.includes('web_1') || c.name.includes('cache_1')
+      );
+      const hasCmd = history.some((cmd) => cmd.includes('docker-compose up'));
+      return hasComposeContainers || hasCmd;
+    },
+  },
+
+  {
+    id: 'mission-51',
+    title: 'Kubernetes Manifest Deployment',
+    description:
+      'Apply the Kubernetes deployment manifest at /home/user/projects/k8s/deployment.yaml using `kubectl apply -f`.',
+    difficulty: 'cloud-native',
+    hint: 'kubectl apply -f /home/user/projects/k8s/deployment.yaml',
+    completed: false,
+    validator: (_vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const k8s = getK8sState();
+      const hasDeployment = k8s.deployments.some((d) => d.name === 'webapp');
+      const hasPods = k8s.pods.some((p) => p.name.startsWith('webapp'));
+      return hasDeployment && hasPods;
+    },
+  },
+
+  {
+    id: 'mission-52',
+    title: 'Kubernetes Horizontal Scaling',
+    description:
+      'Scale the webapp deployment to 4 replicas using `kubectl scale deployment webapp --replicas=4`.',
+    difficulty: 'cloud-native',
+    hint: 'kubectl scale deployment webapp --replicas=4',
+    completed: false,
+    validator: (_vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const k8s = getK8sState();
+      const webapp = k8s.deployments.find((d) => d.name === 'webapp');
+      return (webapp && webapp.replicas >= 4) || k8s.pods.filter((p) => p.name.startsWith('webapp')).length >= 4;
+    },
+  },
+
+  {
+    id: 'mission-53',
+    title: 'Kubernetes Self-Healing Test',
+    description:
+      'Delete one of the running pods using `kubectl delete pod <pod-name>`, verify Kubernetes auto-respawns a replacement, and save `kubectl get pods` to ~/k8s_pods.txt.',
+    difficulty: 'cloud-native',
+    hint: 'kubectl get pods, then kubectl delete pod <name>, then kubectl get pods > ~/k8s_pods.txt',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, history: string[]): boolean => {
+      const file = vfs.getNode('/home/user/k8s_pods.txt', true);
+      const hasDel = history.some((cmd) => cmd.includes('kubectl delete pod'));
+      return hasDel && !!file?.content && file.content.includes('Running');
+    },
+  },
+
+  {
+    id: 'mission-54',
+    title: 'Terminal Session Recording',
+    description:
+      'Record an asciicast terminal session to ~/demo.cast using `script ~/demo.cast`, execute any command, and type `exit` to finalize the recording.',
+    difficulty: 'cloud-native',
+    hint: 'script ~/demo.cast, run whoami, then exit',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const cast = vfs.getNode('/home/user/demo.cast', true);
+      return !!cast?.content && (cast.content.includes('"version"') || cast.content.includes('"events"'));
+    },
+  },
+
+  {
+    id: 'mission-55',
+    title: 'The Ultimate Cloud Architect',
+    description:
+      'Have /dev/sdb1 mounted, net.ipv4.ip_forward=1 enabled, the Nginx service running, and at least 3 Kubernetes pods active at the same time!',
+    difficulty: 'cloud-native',
+    hint: 'sudo mount /dev/sdb1 /mnt/external && sudo sysctl -w net.ipv4.ip_forward=1 && systemctl start nginx && kubectl scale deployment webapp --replicas=3',
+    completed: false,
+    validator: (_vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const storage = getStorageState();
+      const isMounted = storage.devices.some(
+        (d) => (d.name === 'sdb1' && !!d.mountpoint) ||
+               d.children?.some((c) => c.name === 'sdb1' && !!c.mountpoint)
+      );
+      const confNode = _vfs.getNode('/etc/sysctl.conf', true);
+      const ipForward = !!confNode?.content?.includes('net.ipv4.ip_forward = 1') ||
+                        !!confNode?.content?.includes('net.ipv4.ip_forward=1');
+      const nginxRunning = isServiceRunning('nginx');
+      const k8s = getK8sState();
+      const podsCount = k8s.pods.filter((p) => p.status === 'Running').length;
+      return isMounted && ipForward && nginxRunning && podsCount >= 3;
     },
   },
 ];

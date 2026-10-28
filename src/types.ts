@@ -135,10 +135,103 @@ export interface Mission {
   id: string;
   title: string;
   description: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'master' | 'architect';
+  difficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'master' | 'architect' | 'cloud-native';
   hint: string;
   validator: (vfs: any, history: string[]) => boolean;
   completed: boolean;
+  isCustom?: boolean;
+}
+
+export interface K8sPod {
+  name: string;
+  namespace: string;
+  ready: string;
+  status: 'Running' | 'Pending' | 'Terminating' | 'CrashLoopBackOff';
+  restarts: number;
+  age: string;
+  ip: string;
+  node: string;
+  deployment?: string;
+  image?: string;
+}
+
+export interface K8sDeployment {
+  name: string;
+  namespace: string;
+  ready: string;
+  upToDate: number;
+  available: number;
+  age: string;
+  image: string;
+  replicas: number;
+}
+
+export interface K8sService {
+  name: string;
+  namespace: string;
+  type: 'ClusterIP' | 'NodePort' | 'LoadBalancer';
+  clusterIP: string;
+  externalIP: string;
+  ports: string;
+  age: string;
+  selector: Record<string, string>;
+}
+
+export interface K8sClusterState {
+  nodes: { name: string; status: string; roles: string; age: string; version: string; internalIP: string }[];
+  namespaces: string[];
+  deployments: K8sDeployment[];
+  pods: K8sPod[];
+  services: K8sService[];
+}
+
+export interface BlockDevice {
+  name: string;
+  majMin: string;
+  rm: boolean;
+  size: string;
+  ro: boolean;
+  type: 'disk' | 'part' | 'rom';
+  mountpoint: string | null;
+  fsType?: string;
+  children?: BlockDevice[];
+}
+
+export interface StorageState {
+  devices: BlockDevice[];
+  mountedVolumes: Record<string, { device: string; mountpoint: string; files: Record<string, string> }>;
+}
+
+export interface RecordedSessionEvent {
+  timestamp: number;
+  type: 'command' | 'output' | 'error';
+  data: string;
+}
+
+export interface RecordedSession {
+  version: 2;
+  width: number;
+  height: number;
+  timestamp: number;
+  title: string;
+  events: RecordedSessionEvent[];
+}
+
+export interface CustomMissionRule {
+  type: 'file_exists' | 'file_contains' | 'command_executed' | 'service_active';
+  target: string;
+  pattern?: string;
+}
+
+export interface CustomMission {
+  id: string;
+  title: string;
+  description: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'master' | 'architect' | 'cloud-native';
+  hint: string;
+  rules: CustomMissionRule[];
+  completed: boolean;
+  isCustom: true;
 }
 
 export interface ProcessInfo {

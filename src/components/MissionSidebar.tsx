@@ -8,6 +8,7 @@ import {
   HelpCircle,
   Sparkles,
   Award,
+  Plus,
 } from 'lucide-react';
 import type { Mission } from '../types';
 
@@ -16,6 +17,7 @@ interface MissionSidebarProps {
   onCheckMission: (id: string) => void;
   isOpen: boolean;
   onToggle: () => void;
+  onOpenLabBuilder?: () => void;
 }
 
 export const MissionSidebar: React.FC<MissionSidebarProps> = ({
@@ -23,13 +25,14 @@ export const MissionSidebar: React.FC<MissionSidebarProps> = ({
   onCheckMission,
   isOpen,
   onToggle,
+  onOpenLabBuilder,
 }) => {
-  const [filter, setFilter] = useState<'all' | 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'master' | 'architect'>('all');
+  const [filter, setFilter] = useState<'all' | 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'master' | 'architect' | 'cloud-native'>('all');
   const [expandedHints, setExpandedHints] = useState<Record<string, boolean>>({});
 
   const completedCount = missions.filter((m) => m.completed).length;
   const totalCount = missions.length;
-  const progressPercent = Math.round((completedCount / totalCount) * 100);
+  const progressPercent = Math.round((completedCount / (totalCount || 1)) * 100);
 
   const filteredMissions = missions.filter((m) => {
     if (filter === 'all') return true;
@@ -54,6 +57,10 @@ export const MissionSidebar: React.FC<MissionSidebarProps> = ({
         return 'text-violet-400 bg-violet-500/10 border-violet-500/20';
       case 'architect':
         return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20';
+      case 'cloud-native':
+        return 'text-sky-400 bg-sky-500/10 border-sky-500/20';
+      default:
+        return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
     }
   };
 
@@ -88,11 +95,23 @@ export const MissionSidebar: React.FC<MissionSidebarProps> = ({
                   <p className="text-[11px] text-slate-400">Interactive curriculum</p>
                 </div>
               </div>
-              <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-emerald-400">
-                <Award size={12} />
-                <span>
-                  {completedCount}/{totalCount}
-                </span>
+              <div className="flex items-center gap-2">
+                {onOpenLabBuilder && (
+                  <button
+                    onClick={onOpenLabBuilder}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-[11px] font-medium transition-all"
+                    title="Design a Custom Mission"
+                  >
+                    <Plus size={11} />
+                    <span>Custom</span>
+                  </button>
+                )}
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-emerald-400">
+                  <Award size={12} />
+                  <span>
+                    {completedCount}/{totalCount}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -111,8 +130,8 @@ export const MissionSidebar: React.FC<MissionSidebarProps> = ({
             </div>
 
             {/* Difficulty Tabs */}
-            <div className="flex gap-1 mt-3 p-0.5 bg-black/20 rounded-lg border border-white/5 text-[11px] overflow-x-auto">
-              {(['all', 'beginner', 'intermediate', 'advanced', 'expert', 'master', 'architect'] as const).map((tab) => (
+            <div className="flex gap-1 mt-3 p-0.5 bg-black/20 rounded-lg border border-white/5 text-[10px] overflow-x-auto scrollbar-none">
+              {(['all', 'beginner', 'intermediate', 'advanced', 'expert', 'master', 'architect', 'cloud-native'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setFilter(tab)}
@@ -122,7 +141,7 @@ export const MissionSidebar: React.FC<MissionSidebarProps> = ({
                       : 'text-slate-400 hover:text-slate-300'
                   }`}
                 >
-                  {tab}
+                  {tab === 'cloud-native' ? 'Cloud' : tab}
                 </button>
               ))}
             </div>

@@ -1,5 +1,7 @@
 import { registry } from '../commandRegistry';
 import type { ShellState, CommandResult } from '../../types';
+import type { VirtualFileSystem } from '../../vfs/fileSystem';
+import { isRecordingSession, finishRecording } from './recorder';
 
 export function registerUtilityCommands() {
   // history
@@ -26,7 +28,11 @@ export function registerUtilityCommands() {
   });
 
   // exit and logout
-  const exitHandler = (_args: string[], _flags: Record<string, string | boolean>, shellState: ShellState): CommandResult => {
+  const exitHandler = (_args: string[], _flags: Record<string, string | boolean>, shellState: ShellState, vfs: VirtualFileSystem): CommandResult => {
+    if (isRecordingSession()) {
+      const res = finishRecording(vfs);
+      return { stdout: `exit\nScript done, file is ${res?.filename || 'typescript'}`, stderr: '', exitCode: 0 };
+    }
     if (shellState.remoteSession) {
       shellState.remoteSession = null;
       return { stdout: 'Connection to 10.0.0.5 closed.', stderr: '', exitCode: 0 };

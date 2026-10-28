@@ -2,6 +2,7 @@ import { registry } from '../commandRegistry';
 import type { CommandResult } from '../../types';
 import { getRunningServicesList } from './sysadmin';
 import { resolveHostname } from './networkCrypto';
+import { getStorageState } from './kernelStorage';
 
 export function registerSystemCommands() {
   // neofetch
@@ -170,13 +171,22 @@ export function registerSystemCommands() {
     usage: 'df [-h]',
     flags: [{ flag: '-h', description: 'Human-readable sizes' }],
     handler: () => {
-      const output = [
+      const storage = getStorageState();
+      const sdb = storage.devices.find((d) => d.name === 'sdb');
+      const sdb1 = sdb?.children?.find((c) => c.name === 'sdb1');
+
+      const lines = [
         'Filesystem      Size  Used Avail Use% Mounted on',
         '/dev/sda1        50G   12G   35G  26% /',
         'tmpfs           4.0G  156M  3.9G   4% /tmp',
         '/dev/sda2        20G  5.2G   14G  28% /home',
-      ].join('\n');
-      return { stdout: output, stderr: '', exitCode: 0 };
+      ];
+
+      if (sdb1?.mountpoint) {
+        lines.push(`/dev/sdb1        20G   44M   19G   1% ${sdb1.mountpoint}`);
+      }
+
+      return { stdout: lines.join('\n'), stderr: '', exitCode: 0 };
     },
   });
 
