@@ -1,5 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, RefreshCw, BookOpen, User, FolderOpen, Download, Upload, Activity } from 'lucide-react';
+import {
+  Terminal,
+  RefreshCw,
+  BookOpen,
+  User,
+  FolderOpen,
+  Download,
+  Upload,
+  Activity,
+  Flame,
+  Palette,
+} from 'lucide-react';
+import type { TerminalTheme } from '../types';
+import { THEMES } from '../styles/themes';
 
 interface TopBarProps {
   cwd: string;
@@ -10,6 +23,10 @@ interface TopBarProps {
   onImportVFS?: (jsonString: string) => void;
   onToggleSystemMonitor?: () => void;
   isSystemMonitorOpen?: boolean;
+  theme?: TerminalTheme;
+  onThemeChange?: (theme: TerminalTheme) => void;
+  onOpenIncidents?: () => void;
+  activeIncidentsCount?: number;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -21,6 +38,10 @@ export const TopBar: React.FC<TopBarProps> = ({
   onImportVFS,
   onToggleSystemMonitor,
   isSystemMonitorOpen,
+  theme = 'slate',
+  onThemeChange,
+  onOpenIncidents,
+  activeIncidentsCount = 0,
 }) => {
   const [time, setTime] = useState(() => new Date());
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -77,7 +98,43 @@ export const TopBar: React.FC<TopBarProps> = ({
       <div className="flex-1" />
 
       {/* Right side */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
+        {/* Incident Response Simulator Button */}
+        {onOpenIncidents && (
+          <button
+            onClick={onOpenIncidents}
+            className="flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs font-medium transition-all border bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border-rose-500/30"
+            title="Break-Fix Incident Simulator"
+          >
+            <Flame size={13} className="text-rose-400 animate-pulse" />
+            <span className="hidden sm:inline">Incidents</span>
+            {activeIncidentsCount > 0 && (
+              <span className="px-1.5 py-0.1 text-[10px] font-mono rounded-full bg-rose-500/30 text-rose-200">
+                {activeIncidentsCount}
+              </span>
+            )}
+          </button>
+        )}
+
+        {/* Theme Switcher */}
+        {onThemeChange && (
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/5 border border-white/5 text-xs text-slate-300">
+            <Palette size={12} className="text-slate-400" />
+            <select
+              value={theme}
+              onChange={(e) => onThemeChange(e.target.value as TerminalTheme)}
+              className="bg-transparent text-slate-300 text-[11px] outline-none cursor-pointer pr-1"
+            >
+              {Object.values(THEMES).map((t) => (
+                <option key={t.id} value={t.id} className="bg-[#141625] text-slate-200">
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* System Monitor Toggle */}
         {onToggleSystemMonitor && (
           <button
             onClick={onToggleSystemMonitor}

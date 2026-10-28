@@ -246,15 +246,35 @@ export function registerTextCommands() {
   registry.register({
     name: 'tail',
     description: 'Output the last part of files',
-    usage: 'tail [-n <count>] [file...]',
-    flags: [{ flag: '-n', description: 'Number of lines to show (default 10)' }],
-    handler: (args, flags, shellState, vfs, stdin) => {
+    usage: 'tail [-n <count>] [-f] [file...]',
+    flags: [
+      { flag: '-n', description: 'Number of lines to show (default 10)' },
+      { flag: '-f', description: 'Follow file as it grows (streaming mode)' },
+    ],
+    handler: (args, flags, shellState, vfs, stdin, context) => {
       const count = typeof flags['n'] === 'string' ? parseInt(flags['n'], 10) : 10;
 
       const tailText = (text: string): string => {
         const lines = text.split('\n');
         return lines.slice(-count).join('\n');
       };
+
+      if (flags['f'] && args.length > 0) {
+        const file = args[0];
+        const path = resolve(file, shellState);
+        const node = vfs.getNode(path);
+        if (!node) {
+          return { stdout: '', stderr: `tail: cannot open '${file}' for reading: No such file or directory`, exitCode: 1 };
+        }
+        if (context?.setStreamingState) {
+          context.setStreamingState({
+            type: 'tail',
+            target: path,
+            lastOutput: tailText(node.content || ''),
+          });
+          return { stdout: '', stderr: '', exitCode: 0 };
+        }
+      }
 
       if (args.length > 0) {
         const outputs: string[] = [];

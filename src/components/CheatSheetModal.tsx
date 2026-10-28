@@ -37,6 +37,9 @@ export const CheatSheetModal: React.FC<CheatSheetModalProps> = ({
   };
 
   const categorize = (name: string): string => {
+    const runtimes = ['python3', 'python', 'node', 'sqlite3'];
+    const dnsCrypto = ['ip', 'dig', 'nslookup', 'traceroute', 'base64', 'sha256sum', 'md5sum', 'openssl', 'ssh-keygen', 'ssh-copy-id'];
+    const multiplexJobs = ['tmux', 'watch', 'jobs', 'fg', 'bg', 'sleep', 'nohup'];
     const vim = ['vim', 'vi'];
     const git = ['git'];
     const docker = ['docker'];
@@ -51,6 +54,9 @@ export const CheatSheetModal: React.FC<CheatSheetModalProps> = ({
     const sys = ['neofetch', 'uname', 'hostname', 'date', 'uptime', 'cal', 'df', 'du', 'free', 'ps', 'top', 'htop', 'kill', 'ping'];
     const script = ['bash', 'sh'];
 
+    if (runtimes.includes(name)) return 'Runtimes & SQL';
+    if (dnsCrypto.includes(name)) return 'DNS & Cryptography';
+    if (multiplexJobs.includes(name)) return 'Multiplexing & Jobs';
     if (vim.includes(name)) return 'Vim Editor';
     if (git.includes(name)) return 'Git & Version Control';
     if (docker.includes(name)) return 'Docker Containers';
@@ -69,6 +75,9 @@ export const CheatSheetModal: React.FC<CheatSheetModalProps> = ({
 
   const categories = [
     'all',
+    'Multiplexing & Jobs',
+    'Runtimes & SQL',
+    'DNS & Cryptography',
     'Vim Editor',
     'Git & Version Control',
     'Docker Containers',

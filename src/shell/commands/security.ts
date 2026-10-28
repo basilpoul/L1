@@ -1,6 +1,7 @@
 import { registry } from '../commandRegistry';
 import { resolvePath } from '../../vfs/pathResolver';
 import type { ShellState, CommandResult } from '../../types';
+import { resolveHostname } from './networkCrypto';
 
 function resolve(p: string, s: ShellState): string {
   return resolvePath(p, s.cwd, s.env['HOME'] || '/home/user');
@@ -433,7 +434,7 @@ export function registerSecurityCommands() {
     description: 'OpenSSH SSH client (remote login program)',
     usage: 'ssh [user@]hostname [command]',
     flags: [],
-    handler: (args, _flags, shellState): CommandResult => {
+    handler: (args, _flags, shellState, vfs): CommandResult => {
       if (args.length === 0) {
         return { stdout: '', stderr: 'usage: ssh [-46AaCfGgKkMNnqsTtVvXxYy] [-B bind_interface] [user@]hostname [command]', exitCode: 1 };
       }
@@ -448,7 +449,9 @@ export function registerSecurityCommands() {
         host = target;
       }
 
-      if (host !== '10.0.0.5' && host !== 'prod-node') {
+      const resolved = resolveHostname(host, vfs);
+
+      if (resolved.ip !== '10.0.0.5' && resolved.hostname !== 'prod-node') {
         return { stdout: '', stderr: `ssh: connect to host ${host} port 22: Connection timed out`, exitCode: 255 };
       }
 
@@ -517,7 +520,11 @@ Last login: Wed Oct 28 10:14:22 2026 from 10.0.0.1`,
       }
 
       // Remote to Local: scp admin@10.0.0.5:/home/admin/flag.txt ~/flag.txt
-      if (src.includes(':') && (src.includes('10.0.0.5') || src.includes('prod-node'))) {
+      const srcHost = src.includes(':') ? src.split(':')[0].replace(/.*@/, '') : '';
+      const resolvedSrc = srcHost ? resolveHostname(srcHost, vfs) : null;
+      const isSrcRemote = resolvedSrc && (resolvedSrc.ip === '10.0.0.5' || resolvedSrc.hostname === 'prod-node');
+
+      if (src.includes(':') && isSrcRemote) {
         const remoteFilePath = src.split(':')[1];
         const remoteContent = REMOTE_PROD_FILES[remoteFilePath];
 
@@ -538,7 +545,11 @@ Last login: Wed Oct 28 10:14:22 2026 from 10.0.0.1`,
       }
 
       // Local to Remote: scp local.txt admin@10.0.0.5:/home/admin/local.txt
-      if (dst.includes(':') && (dst.includes('10.0.0.5') || dst.includes('prod-node'))) {
+      const dstHost = dst.includes(':') ? dst.split(':')[0].replace(/.*@/, '') : '';
+      const resolvedDst = dstHost ? resolveHostname(dstHost, vfs) : null;
+      const isDstRemote = resolvedDst && (resolvedDst.ip === '10.0.0.5' || resolvedDst.hostname === 'prod-node');
+
+      if (dst.includes(':') && isDstRemote) {
         const localPath = resolve(src, shellState);
         const node = vfs.getNode(localPath, true);
         if (!node || node.type !== 'file') {

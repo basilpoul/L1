@@ -23,6 +23,8 @@ export interface ExecutionContext {
   onCtrlC: (handler: () => void) => void;
   setNanoState: (state: any) => void;
   setVimState?: (state: any) => void;
+  setStreamingState?: (state: any) => void;
+  triggerSplit?: (direction: 'horizontal' | 'vertical') => void;
 }
 
 /**

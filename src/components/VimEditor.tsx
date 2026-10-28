@@ -614,7 +614,8 @@ export const VimEditor: React.FC<VimEditorProps> = ({
       ref={containerRef}
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      className="flex flex-col h-full font-mono text-sm outline-none select-none"
+      onClick={() => containerRef.current?.focus()}
+      className="flex flex-col h-full font-mono text-sm outline-none select-none cursor-text"
       style={{ background: '#0f111a', color: '#c0caf5' }}
     >
       {/* Buffer Area */}

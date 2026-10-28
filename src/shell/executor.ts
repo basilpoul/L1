@@ -1,6 +1,6 @@
 // Shell Executor - Main execution engine for the Linux simulator shell
 import type { VirtualFileSystem } from '../vfs/fileSystem';
-import type { ShellState, CommandResult } from '../types';
+import type { ShellState, CommandResult, BackgroundJob } from '../types';
 import { tokenize } from './lexer';
 import { parseTokens } from './parser';
 import { expandVariables } from './environment';
@@ -331,6 +331,43 @@ export async function executeCommand(
     shellState.history[shellState.history.length - 1] !== trimmed
   ) {
     shellState.history.push(trimmed);
+  }
+
+  // Handle trailing & background job execution
+  const isBackground = /(?<!&)&$/.test(trimmed);
+  if (isBackground) {
+    const cmdWithoutAmp = trimmed.replace(/(?<!&)&$/, '').trim();
+    if (!shellState.jobs) {
+      shellState.jobs = [];
+    }
+    const jobId = shellState.jobs.length + 1;
+    const pid = 4000 + Math.floor(Math.random() * 2000);
+    const job: BackgroundJob = {
+      id: jobId,
+      pid,
+      command: cmdWithoutAmp,
+      status: 'Running',
+      startTime: new Date(),
+    };
+    shellState.jobs.push(job);
+
+    context.addLine('output', `[${jobId}] ${pid}`);
+
+    // Asynchronously run the command in background
+    setTimeout(async () => {
+      try {
+        await executeCommand(cmdWithoutAmp, shellState, vfs, {
+          ...context,
+          addLine: () => {},
+          setRunning: () => {},
+        });
+        job.status = 'Done';
+      } catch {
+        job.status = 'Done';
+      }
+    }, 10);
+
+    return { stdout: `[${jobId}] ${pid}`, stderr: '', exitCode: 0 };
   }
 
   // Handle remote interactive session

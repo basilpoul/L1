@@ -52,6 +52,21 @@ export interface CommandResult {
   exitCode: number;
 }
 
+export interface BackgroundJob {
+  id: number; // 1, 2, 3...
+  pid: number;
+  command: string;
+  status: 'Running' | 'Done' | 'Stopped';
+  startTime: Date;
+}
+
+export interface StreamingState {
+  type: 'watch' | 'tail';
+  target: string;
+  interval?: number;
+  lastOutput?: string;
+}
+
 export interface ShellState {
   cwd: string;
   env: Record<string, string>;
@@ -62,6 +77,7 @@ export interface ShellState {
   isRoot: boolean; // sudo mode
   userStack?: { user: string; home: string; isRoot: boolean }[];
   remoteSession?: { host: string; hostname: string; user: string; cwd: string } | null;
+  jobs?: BackgroundJob[];
 }
 
 export interface TerminalLine {
@@ -72,6 +88,16 @@ export interface TerminalLine {
   timestamp: Date;
 }
 
+export interface TerminalPane {
+  id: string;
+  lines: TerminalLine[];
+  shellState: ShellState;
+  isRunning: boolean;
+  nanoState?: NanoState | null;
+  vimState?: VimState | null;
+  streamingState?: StreamingState | null;
+}
+
 export interface TerminalTab {
   id: string;
   title: string;
@@ -80,6 +106,9 @@ export interface TerminalTab {
   isRunning: boolean; // for async commands like ping
   nanoState?: NanoState | null;
   vimState?: VimState | null;
+  panes?: TerminalPane[];
+  activePaneId?: string;
+  splitDirection?: 'horizontal' | 'vertical' | null;
 }
 
 export interface NanoState {
@@ -100,11 +129,13 @@ export interface VimState {
   modified?: boolean;
 }
 
+export type TerminalTheme = 'slate' | 'tokyo' | 'catppuccin' | 'dracula' | 'matrix';
+
 export interface Mission {
   id: string;
   title: string;
   description: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'master';
+  difficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'master' | 'architect';
   hint: string;
   validator: (vfs: any, history: string[]) => boolean;
   completed: boolean;

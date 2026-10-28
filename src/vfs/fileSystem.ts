@@ -620,8 +620,10 @@ export class VirtualFileSystem {
     }
     this.saveTimeout = setTimeout(() => {
       try {
-        const serialized = this.serialize();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(serialized));
+        if (typeof localStorage !== 'undefined') {
+          const serialized = this.serialize();
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(serialized));
+        }
       } catch (e) {
         console.error('Failed to save VFS to localStorage:', e);
       }
@@ -788,6 +790,7 @@ export class VirtualFileSystem {
 
   private loadFromStorage(): VFSNode | null {
     try {
+      if (typeof localStorage === 'undefined') return null;
       const stored = localStorage.getItem(STORAGE_KEY);
       if (!stored) return null;
 

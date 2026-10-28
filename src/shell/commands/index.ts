@@ -10,6 +10,9 @@ import { registerSysadminCommands } from './sysadmin';
 import { registerGitCommands } from './git';
 import { registerDockerCommands } from './docker';
 import { registerSecurityCommands } from './security';
+import { registerNetworkCryptoCommands } from './networkCrypto';
+import { registerRuntimeCommands } from './runtimes';
+import { registerJobControlCommands } from './jobControl';
 
 let registered = false;
 
@@ -28,4 +31,7 @@ export function registerAllCommands() {
   registerGitCommands();
   registerDockerCommands();
   registerSecurityCommands();
+  registerNetworkCryptoCommands();
+  registerRuntimeCommands();
+  registerJobControlCommands();
 }

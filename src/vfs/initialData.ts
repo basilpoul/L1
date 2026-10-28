@@ -205,7 +205,63 @@ export function createInitialFileSystem(): VFSNode {
     'root',
   );
 
-  const varDir = dir('var', [log], 'rwxr-xr-x', 'root', 'root');
+  const initialAppDb = JSON.stringify(
+    {
+      tables: {
+        employees: {
+          columns: ['id', 'name', 'role', 'salary', 'department'],
+          rows: [
+            { id: 1, name: 'Linus Torvalds', role: 'Principal Engineer', salary: 250000, department: 'Kernel' },
+            { id: 2, name: 'Ada Lovelace', role: 'Lead Architect', salary: 220000, department: 'Core' },
+            { id: 3, name: 'Grace Hopper', role: 'Systems Director', salary: 210000, department: 'DevOps' },
+            { id: 4, name: 'Ken Thompson', role: 'Staff Engineer', salary: 195000, department: 'Systems' },
+            { id: 5, name: 'Dennis Ritchie', role: 'Chief Scientist', salary: 240000, department: 'R&D' },
+          ],
+        },
+        audit_logs: {
+          columns: ['id', 'event', 'user', 'timestamp'],
+          rows: [
+            { id: 101, event: 'LOGIN_SUCCESS', user: 'admin', timestamp: '2026-10-28 10:15:32' },
+            { id: 102, event: 'SERVICE_START', user: 'systemd', timestamp: '2026-10-28 10:15:35' },
+            { id: 103, event: 'PRIVILEGE_ELEVATION', user: 'user', timestamp: '2026-10-28 10:25:17' },
+            { id: 104, event: 'BACKUP_SCHEDULED', user: 'cron', timestamp: '2026-10-28 11:00:00' },
+          ],
+        },
+      },
+    },
+    null,
+    2
+  );
+
+  const lib = dir('lib', [file('app.db', initialAppDb, 'rw-r--r--', 'root', 'root')], 'rwxr-xr-x', 'root', 'root');
+  const backups = dir(
+    'backups',
+    [
+      file(
+        'db_backup.tar.gz',
+        `TAR_ARCHIVE_V1:${JSON.stringify({ 'var/lib/app.db': initialAppDb })}`,
+        'rw-r--r--',
+        'root',
+        'root'
+      ),
+    ],
+    'rwxr-xr-x',
+    'root',
+    'root'
+  );
+
+  const varDir = dir(
+    'var',
+    [
+      log,
+      lib,
+      backups,
+      file('secret_flag.b64', 'Q1RGe2FyY2hpdGVjdF9tYXN0ZXJfMjAyNn0=\n', 'rw-r--r--', 'root', 'root'),
+    ],
+    'rwxr-xr-x',
+    'root',
+    'root'
+  );
 
   // /bin
   const binDir = dir(
@@ -224,6 +280,10 @@ export function createInitialFileSystem(): VFSNode {
       binFile('sh'),
       binFile('echo'),
       binFile('date'),
+      binFile('python3'),
+      binFile('node'),
+      binFile('sqlite3'),
+      binFile('tmux'),
     ],
     'rwxr-xr-x',
     'root',
@@ -231,7 +291,21 @@ export function createInitialFileSystem(): VFSNode {
   );
 
   // /tmp
-  const tmpDir = dir('tmp', [], 'rwxrwxrwt', 'root', 'root');
+  const tmpDir = dir(
+    'tmp',
+    [
+      file(
+        '.hidden_payload.b64',
+        'U0VDUkVUX0ZMQUd7ZjByM25zMWNzX200c3Qzcl8yMDI2fQ==\n',
+        'rw-r--r--',
+        'user',
+        'user'
+      ),
+    ],
+    'rwxrwxrwt',
+    'root',
+    'root'
+  );
 
   // /root
   const rootHome = dir('root', [], 'rwx------', 'root', 'root');

@@ -5,13 +5,14 @@ import { FileExplorerGUI } from './FileExplorerGUI';
 import { SystemMonitorGUI } from './SystemMonitorGUI';
 import { MissionSidebar } from './MissionSidebar';
 import { CheatSheetModal } from './CheatSheetModal';
+import { IncidentModal } from './IncidentModal';
 import { useVFS } from '../hooks/useVFS';
 import { useTerminal } from '../hooks/useTerminal';
 import { useShellInit } from '../hooks/useShell';
 import { useCronDaemon } from '../hooks/useCronDaemon';
 import { missions as defaultMissions } from '../data/missions';
 import { registry } from '../shell/commandRegistry';
-import type { Mission } from '../types';
+import type { Mission, TerminalTheme } from '../types';
 import { FolderTree, Sparkles, Trophy, PanelRightClose, PanelRightOpen, Activity } from 'lucide-react';
 
 const MISSIONS_STORAGE_KEY = 'linux-sim-missions';
@@ -26,7 +27,11 @@ export const DesktopLayout: React.FC = () => {
   const [isSystemMonitorOpen, setIsSystemMonitorOpen] = useState(false);
   const [isMissionSidebarOpen, setIsMissionSidebarOpen] = useState(false);
   const [isCheatSheetOpen, setIsCheatSheetOpen] = useState(false);
+  const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
   const [celebrationToast, setCelebrationToast] = useState<string | null>(null);
+  const [theme, setTheme] = useState<TerminalTheme>(
+    () => (localStorage.getItem('linuxsim_theme') as TerminalTheme) || 'slate'
+  );
 
   // Load missions from localStorage or use defaults
   const [missionsList, setMissionsList] = useState<Mission[]>(() => {
@@ -175,6 +180,12 @@ export const DesktopLayout: React.FC = () => {
           });
         }}
         isSystemMonitorOpen={isSystemMonitorOpen}
+        theme={theme}
+        onThemeChange={(t) => {
+          setTheme(t);
+          localStorage.setItem('linuxsim_theme', t);
+        }}
+        onOpenIncidents={() => setIsIncidentModalOpen(true)}
       />
 
       {/* Main Workspace */}
@@ -199,6 +210,10 @@ export const DesktopLayout: React.FC = () => {
             onAddTab={terminal.addTab}
             onCloseTab={terminal.closeTab}
             onSetActiveTab={terminal.switchTab}
+            onSplitTab={terminal.splitTab}
+            onClosePane={terminal.closePane}
+            onSetActivePane={terminal.setActivePane}
+            onClearStreaming={(paneId) => terminal.setStreamingState(paneId, null)}
             nanoState={terminal.getNanoState()}
             onNanoSave={terminal.saveNano}
             onNanoExit={terminal.exitNano}
@@ -214,6 +229,7 @@ export const DesktopLayout: React.FC = () => {
             shellState={terminal.shellState}
             isRunning={terminal.isRunning}
             vfs={vfs}
+            theme={theme}
           />
 
           {/* Bottom Dock / Fast Access buttons */}
@@ -307,6 +323,15 @@ export const DesktopLayout: React.FC = () => {
         isOpen={isCheatSheetOpen}
         onClose={() => setIsCheatSheetOpen(false)}
         commands={registry.getAll()}
+      />
+
+      {/* Break-Fix Incident Simulator Modal */}
+      <IncidentModal
+        isOpen={isIncidentModalOpen}
+        onClose={() => setIsIncidentModalOpen(false)}
+        vfs={vfs}
+        onRefresh={refresh}
+        history={terminal.activeTab?.shellState.history || []}
       />
     </div>
   );

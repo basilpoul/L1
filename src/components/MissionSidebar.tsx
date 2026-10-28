@@ -24,7 +24,7 @@ export const MissionSidebar: React.FC<MissionSidebarProps> = ({
   isOpen,
   onToggle,
 }) => {
-  const [filter, setFilter] = useState<'all' | 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'master'>('all');
+  const [filter, setFilter] = useState<'all' | 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'master' | 'architect'>('all');
   const [expandedHints, setExpandedHints] = useState<Record<string, boolean>>({});
 
   const completedCount = missions.filter((m) => m.completed).length;
@@ -52,6 +52,8 @@ export const MissionSidebar: React.FC<MissionSidebarProps> = ({
         return 'text-purple-400 bg-purple-500/10 border-purple-500/20';
       case 'master':
         return 'text-violet-400 bg-violet-500/10 border-violet-500/20';
+      case 'architect':
+        return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20';
     }
   };
 
@@ -110,7 +112,7 @@ export const MissionSidebar: React.FC<MissionSidebarProps> = ({
 
             {/* Difficulty Tabs */}
             <div className="flex gap-1 mt-3 p-0.5 bg-black/20 rounded-lg border border-white/5 text-[11px] overflow-x-auto">
-              {(['all', 'beginner', 'intermediate', 'advanced', 'expert', 'master'] as const).map((tab) => (
+              {(['all', 'beginner', 'intermediate', 'advanced', 'expert', 'master', 'architect'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setFilter(tab)}

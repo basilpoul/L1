@@ -591,4 +591,155 @@ export const missions: Mission[] = [
       return !!webappNode && !!backupNode && nginxRunning && !!statusNode?.content;
     },
   },
+
+  // ── Architect & CTF (36-45) ────────────────────────────────────
+
+  {
+    id: 'mission-36',
+    title: 'Terminal Multiplexing',
+    description:
+      'Split the terminal window into multiple panes using `tmux` or `tmux split-window -h`.',
+    difficulty: 'architect',
+    hint: 'tmux split-window -h',
+    completed: false,
+    validator: (_vfs: VirtualFileSystem, history: string[]): boolean => {
+      return history.some((cmd) => cmd.trim().startsWith('tmux'));
+    },
+  },
+
+  {
+    id: 'mission-37',
+    title: 'Background Job Control',
+    description:
+      'Run a sleep command in the background (`sleep 10 &`), list it using `jobs`, and bring it to foreground with `fg`.',
+    difficulty: 'architect',
+    hint: 'sleep 10 & then jobs and fg',
+    completed: false,
+    validator: (_vfs: VirtualFileSystem, history: string[]): boolean => {
+      const hasBg = history.some((cmd) => /sleep\s+\d+\s*&/.test(cmd));
+      const hasJobs = history.some((cmd) => cmd.trim().startsWith('jobs'));
+      const hasFg = history.some((cmd) => cmd.trim().startsWith('fg'));
+      return hasBg && (hasJobs || hasFg);
+    },
+  },
+
+  {
+    id: 'mission-38',
+    title: 'DNS Resolution & Hosts',
+    description:
+      'Add `192.168.1.100 internal.corp` to /etc/hosts and test resolution using `dig internal.corp` or `ping internal.corp`.',
+    difficulty: 'architect',
+    hint: 'echo "192.168.1.100 internal.corp" | sudo tee -a /etc/hosts && dig internal.corp',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, history: string[]): boolean => {
+      const hosts = vfs.getNode('/etc/hosts', true);
+      const hasHost = !!hosts?.content?.includes('internal.corp');
+      const hasLookup = history.some((cmd) => cmd.includes('internal.corp') && (cmd.startsWith('dig') || cmd.startsWith('ping') || cmd.startsWith('nslookup')));
+      return hasHost && hasLookup;
+    },
+  },
+
+  {
+    id: 'mission-39',
+    title: 'Cryptographic Integrity',
+    description:
+      'Generate a SHA-256 hash of /etc/passwd and redirect it to ~/passwd.sha256.',
+    difficulty: 'architect',
+    hint: 'sha256sum /etc/passwd > ~/passwd.sha256',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const hashFile = vfs.getNode('/home/user/passwd.sha256', true);
+      return !!hashFile?.content && /[a-f0-9]{64}/.test(hashFile.content);
+    },
+  },
+
+  {
+    id: 'mission-40',
+    title: 'SSH Keypair Infrastructure',
+    description:
+      'Generate a new SSH keypair using `ssh-keygen -t rsa` and install it on the remote production node using `ssh-copy-id admin@10.0.0.5`.',
+    difficulty: 'architect',
+    hint: 'ssh-keygen -t rsa && ssh-copy-id admin@10.0.0.5',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, history: string[]): boolean => {
+      const pubKey = vfs.getNode('/home/user/.ssh/id_rsa.pub', true);
+      const hasCopy = history.some((cmd) => cmd.startsWith('ssh-copy-id'));
+      return !!pubKey && hasCopy;
+    },
+  },
+
+  {
+    id: 'mission-41',
+    title: 'CTF: Secret Flag Decryption',
+    description:
+      'The system has a base64 encoded flag at /var/secret_flag.b64. Decode it using `base64 -d` and save the plaintext to ~/decoded_flag.txt.',
+    difficulty: 'architect',
+    hint: 'base64 -d /var/secret_flag.b64 > ~/decoded_flag.txt',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const decoded = vfs.getNode('/home/user/decoded_flag.txt', true);
+      return !!decoded?.content?.includes('FLAG{cl13nt_s1d3_l1nux_mast3r_2026}');
+    },
+  },
+
+  {
+    id: 'mission-42',
+    title: 'Embedded Node.js Engine',
+    description:
+      'Use `node -e` or run a Node script to write `{"status":"ok"}` into ~/node_output.json using the bridged `fs` module.',
+    difficulty: 'architect',
+    hint: 'node -e "fs.writeFileSync(\'/home/user/node_output.json\', JSON.stringify({status:\'ok\'}))"',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const nodeOut = vfs.getNode('/home/user/node_output.json', true);
+      return !!nodeOut?.content && nodeOut.content.includes('"status"');
+    },
+  },
+
+  {
+    id: 'mission-43',
+    title: 'Embedded Python Data Pipeline',
+    description:
+      'Run Python 3 via `python3 -c` or script to write "PYTHON_PIPELINE_OK" to ~/py_output.txt.',
+    difficulty: 'architect',
+    hint: 'python3 -c "open(\'/home/user/py_output.txt\', \'w\').write(\'PYTHON_PIPELINE_OK\')"',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const pyOut = vfs.getNode('/home/user/py_output.txt', true);
+      return !!pyOut?.content?.includes('PYTHON_PIPELINE_OK');
+    },
+  },
+
+  {
+    id: 'mission-44',
+    title: 'Relational Database SQL Queries',
+    description:
+      'Execute SQL against the embedded database at /var/lib/app.db using `sqlite3` to query the `employees` table and export results to ~/db_report.txt.',
+    difficulty: 'architect',
+    hint: 'sqlite3 /var/lib/app.db "SELECT * FROM employees" > ~/db_report.txt',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const report = vfs.getNode('/home/user/db_report.txt', true);
+      return !!report?.content && (report.content.includes('Alice') || report.content.includes('Bob') || report.content.includes('DevOps'));
+    },
+  },
+
+  {
+    id: 'mission-45',
+    title: 'Break-Fix Incident Resolution',
+    description:
+      'Open the Incidents modal from the top bar, deploy any scenario or resolve a simulated outage, and verify it in the incident response console.',
+    difficulty: 'architect',
+    hint: 'Click the Incidents button in the top bar, fix the fault, and click Verify Resolution.',
+    completed: false,
+    validator: (_vfs: VirtualFileSystem, history: string[]): boolean => {
+      return history.some((cmd) =>
+        cmd.includes('nginx') ||
+        cmd.includes('/etc/hosts') ||
+        cmd.includes('backup') ||
+        cmd.includes('systemctl restart') ||
+        cmd.includes('crontab')
+      );
+    },
+  },
 ];

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import type { TerminalTab, TerminalLine, ShellState, NanoState, VimState } from '../types';
+import type { TerminalTab, TerminalLine, ShellState, NanoState, VimState, TerminalPane, StreamingState } from '../types';
 import { VirtualFileSystem } from '../vfs/fileSystem';
 import { executeCommand, getCompletions } from '../shell/executor';
 import { createDefaultEnv } from '../shell/environment';
@@ -40,6 +40,7 @@ function createShellState(): ShellState {
     lastExitCode: 0,
     previousDir: '/home/user',
     isRoot: false,
+    jobs: [],
   };
 }
 
@@ -49,27 +50,43 @@ function createTab(index: number, vfs?: VirtualFileSystem): TerminalTab {
     applyBashrc(shellState, vfs);
   }
   const id = genId();
-  return {
-    id,
-    title: `Terminal ${index}`,
-    lines: [
-      {
-        id: genId(),
-        type: 'system' as const,
-        content: 'Welcome to LinuxSim — a browser-based Linux terminal simulator.',
-        timestamp: new Date(),
-      },
-      {
-        id: genId(),
-        type: 'system' as const,
-        content: 'Type "help" to see available commands or try "neofetch" to get started.',
-        timestamp: new Date(),
-      },
-    ],
+  const paneId = genId();
+  const initialLines: TerminalLine[] = [
+    {
+      id: genId(),
+      type: 'system' as const,
+      content: 'Welcome to LinuxSim — a browser-based Linux terminal simulator.',
+      timestamp: new Date(),
+    },
+    {
+      id: genId(),
+      type: 'system' as const,
+      content: 'Type "help" to see available commands or try "neofetch" to get started.',
+      timestamp: new Date(),
+    },
+  ];
+
+  const primaryPane: TerminalPane = {
+    id: paneId,
+    lines: [...initialLines],
     shellState,
     isRunning: false,
     nanoState: null,
     vimState: null,
+    streamingState: null,
+  };
+
+  return {
+    id,
+    title: `Terminal ${index}`,
+    lines: initialLines,
+    shellState,
+    isRunning: false,
+    nanoState: null,
+    vimState: null,
+    panes: [primaryPane],
+    activePaneId: paneId,
+    splitDirection: null,
   };
 }
 
@@ -95,7 +112,12 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
     };
     setTabs(prev => prev.map(t => {
       if (t.id !== activeTabId) return t;
-      return { ...t, lines: [...t.lines, newLine] };
+      const targetPaneId = t.activePaneId || t.panes?.[0]?.id;
+      const updatedPanes = (t.panes || []).map(p => {
+        if (p.id !== targetPaneId) return p;
+        return { ...p, lines: [...p.lines, newLine] };
+      });
+      return { ...t, lines: [...t.lines, newLine], panes: updatedPanes };
     }));
   }, [activeTabId]);
 
@@ -125,26 +147,140 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
     setHistoryIndex(-1);
   }, []);
 
+  const splitTab = useCallback((direction: 'horizontal' | 'vertical') => {
+    setTabs(prev => prev.map(t => {
+      if (t.id !== activeTabId) return t;
+      const existingPanes = t.panes && t.panes.length > 0 ? t.panes : [{
+        id: genId(),
+        lines: t.lines,
+        shellState: t.shellState,
+        isRunning: t.isRunning,
+        nanoState: t.nanoState,
+        vimState: t.vimState,
+        streamingState: null,
+      }];
+
+      if (existingPanes.length >= 2) {
+        return { ...t, panes: existingPanes, splitDirection: direction };
+      }
+
+      const currentPane = existingPanes[0];
+      const newPaneId = genId();
+      const newShellState = createShellState();
+      if (vfs) applyBashrc(newShellState, vfs);
+      newShellState.cwd = currentPane.shellState.cwd;
+      newShellState.env = { ...currentPane.shellState.env };
+
+      const newPane: TerminalPane = {
+        id: newPaneId,
+        lines: [
+          {
+            id: genId(),
+            type: 'system',
+            content: `[tmux] Pane 2 active (${direction} split). VFS shared.`,
+            timestamp: new Date(),
+          },
+        ],
+        shellState: newShellState,
+        isRunning: false,
+        nanoState: null,
+        vimState: null,
+        streamingState: null,
+      };
+
+      return {
+        ...t,
+        panes: [currentPane, newPane],
+        splitDirection: direction,
+        activePaneId: newPaneId,
+      };
+    }));
+  }, [activeTabId, vfs]);
+
+  const closePane = useCallback((paneId: string) => {
+    setTabs(prev => prev.map(t => {
+      if (t.id !== activeTabId || !t.panes || t.panes.length <= 1) return t;
+      const remainingPanes = t.panes.filter(p => p.id !== paneId);
+      const remaining = remainingPanes[0];
+      return {
+        ...t,
+        panes: remainingPanes,
+        splitDirection: null,
+        activePaneId: remaining.id,
+        lines: remaining.lines,
+        shellState: remaining.shellState,
+        isRunning: remaining.isRunning,
+        nanoState: remaining.nanoState,
+        vimState: remaining.vimState,
+      };
+    }));
+  }, [activeTabId]);
+
+  const setActivePane = useCallback((paneId: string) => {
+    setTabs(prev => prev.map(t => {
+      if (t.id !== activeTabId) return t;
+      const target = t.panes?.find(p => p.id === paneId);
+      if (!target) return t;
+      return {
+        ...t,
+        activePaneId: paneId,
+        lines: target.lines,
+        shellState: target.shellState,
+        isRunning: target.isRunning,
+        nanoState: target.nanoState,
+        vimState: target.vimState,
+      };
+    }));
+  }, [activeTabId]);
+
+  const setStreamingState = useCallback((paneId: string, state: StreamingState | null) => {
+    setTabs(prev => prev.map(t => {
+      if (t.id !== activeTabId) return t;
+      const updatedPanes = (t.panes || []).map(p => {
+        if (p.id !== paneId) return p;
+        return { ...p, streamingState: state, isRunning: Boolean(state) };
+      });
+      return {
+        ...t,
+        panes: updatedPanes,
+        isRunning: Boolean(state),
+      };
+    }));
+  }, [activeTabId]);
+
   const handleInput = useCallback((value: string) => {
     setInputValue(value);
   }, []);
 
   const handleSubmit = useCallback(async () => {
     const tab = tabs.find(t => t.id === activeTabId);
-    if (!tab || tab.isRunning) return;
+    if (!tab) return;
+
+    const activePaneId = tab.activePaneId || tab.panes?.[0]?.id || tab.id;
+    const activePane = tab.panes?.find(p => p.id === activePaneId) || {
+      id: activePaneId,
+      lines: tab.lines,
+      shellState: tab.shellState,
+      isRunning: tab.isRunning,
+      nanoState: tab.nanoState,
+      vimState: tab.vimState,
+      streamingState: null,
+    };
+
+    if (activePane.isRunning) return;
 
     const cmd = inputValue.trim();
-    const session = tab.shellState.remoteSession;
+    const session = activePane.shellState.remoteSession;
     let prompt = '';
     if (session) {
       prompt = `<span style="color:#4ade80;font-weight:bold">${session.user}@${session.hostname}</span>:<span style="color:#60a5fa;font-weight:bold">${session.cwd}</span>$ ${cmd.replace(/</g, '&lt;').replace(/>/g, '&gt;')}`;
     } else {
-      const user = tab.shellState.env['USER'] || 'user';
-      const isRoot = tab.shellState.isRoot || user === 'root';
+      const user = activePane.shellState.env['USER'] || 'user';
+      const isRoot = activePane.shellState.isRoot || user === 'root';
       const promptChar = isRoot ? '#' : '$';
-      const home = tab.shellState.env['HOME'] || '/home/user';
-      const displayCwd = tab.shellState.cwd === home ? '~' : tab.shellState.cwd.replace(home, '~');
-      const gitInfo = getGitBranchInfo(tab.shellState.cwd, vfs);
+      const home = activePane.shellState.env['HOME'] || '/home/user';
+      const displayCwd = activePane.shellState.cwd === home ? '~' : activePane.shellState.cwd.replace(home, '~');
+      const gitInfo = getGitBranchInfo(activePane.shellState.cwd, vfs);
       const gitBadge = gitInfo ? ` <span style="color:#a78bfa;font-weight:bold">(${gitInfo.branch}${gitInfo.isDirty ? '*' : ''})</span>` : '';
       prompt = `<span style="color:#4ade80;font-weight:bold">${user}@linux-box</span>:<span style="color:#60a5fa;font-weight:bold">${displayCwd}</span>${gitBadge}${promptChar} ${cmd.replace(/</g, '&lt;').replace(/>/g, '&gt;')}`;
     }
@@ -163,35 +299,69 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
         addLine(type, content, isHtml);
       },
       setRunning: (running: boolean) => {
-        setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, isRunning: running } : t));
+        setTabs(prev => prev.map(t => {
+          if (t.id !== activeTabId) return t;
+          const updatedPanes = (t.panes || []).map(p => p.id === activePaneId ? { ...p, isRunning: running } : p);
+          return { ...t, isRunning: running, panes: updatedPanes };
+        }));
       },
       onCtrlC: (handler: () => void) => {
         ctrlCHandlerRef.current = handler;
       },
       setNanoState: (state: NanoState | null) => {
-        setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, nanoState: state } : t));
+        setTabs(prev => prev.map(t => {
+          if (t.id !== activeTabId) return t;
+          const updatedPanes = (t.panes || []).map(p => p.id === activePaneId ? { ...p, nanoState: state } : p);
+          return { ...t, nanoState: state, panes: updatedPanes };
+        }));
       },
       setVimState: (state: VimState | null) => {
-        setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, vimState: state } : t));
+        setTabs(prev => prev.map(t => {
+          if (t.id !== activeTabId) return t;
+          const updatedPanes = (t.panes || []).map(p => p.id === activePaneId ? { ...p, vimState: state } : p);
+          return { ...t, vimState: state, panes: updatedPanes };
+        }));
+      },
+      setStreamingState: (state: StreamingState | null) => {
+        setTabs(prev => prev.map(t => {
+          if (t.id !== activeTabId) return t;
+          const updatedPanes = (t.panes || []).map(p => p.id === activePaneId ? { ...p, streamingState: state, isRunning: Boolean(state) } : p);
+          return { ...t, panes: updatedPanes, isRunning: Boolean(state) };
+        }));
+      },
+      triggerSplit: (direction: 'horizontal' | 'vertical') => {
+        splitTab(direction);
       },
     };
 
     try {
-      const result = await executeCommand(cmd, tab.shellState, vfs, context);
+      const result = await executeCommand(cmd, activePane.shellState, vfs, context);
 
       // Handle clear command
       if (result.stdout === '__CLEAR__') {
-        setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, lines: [] } : t));
+        setTabs(prev => prev.map(t => {
+          if (t.id !== activeTabId) return t;
+          const updatedPanes = (t.panes || []).map(p => p.id === activePaneId ? { ...p, lines: [] } : p);
+          return { ...t, lines: [], panes: updatedPanes };
+        }));
       }
 
-      // Update the shell state in the tab
-      setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, shellState: { ...tab.shellState } } : t));
+      // Update the shell state in the active pane and tab
+      setTabs(prev => prev.map(t => {
+        if (t.id !== activeTabId) return t;
+        const updatedPanes = (t.panes || []).map(p => p.id === activePaneId ? { ...p, shellState: { ...activePane.shellState } } : p);
+        return {
+          ...t,
+          shellState: { ...activePane.shellState },
+          panes: updatedPanes,
+        };
+      }));
 
       refreshVFS();
     } catch (err) {
       addLine('error', `Error: ${err instanceof Error ? err.message : String(err)}`);
     }
-  }, [tabs, activeTabId, inputValue, vfs, refreshVFS, addLine]);
+  }, [tabs, activeTabId, inputValue, vfs, refreshVFS, addLine, splitTab]);
 
   const handleCtrlC = useCallback(() => {
     if (ctrlCHandlerRef.current) {
@@ -199,9 +369,18 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
       ctrlCHandlerRef.current = null;
     }
     const tab = tabs.find(t => t.id === activeTabId);
-    if (tab?.isRunning) {
-      setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, isRunning: false } : t));
-    }
+    if (!tab) return;
+    const activePaneId = tab.activePaneId || tab.panes?.[0]?.id;
+
+    setTabs(prev => prev.map(t => {
+      if (t.id !== activeTabId) return t;
+      const updatedPanes = (t.panes || []).map(p => {
+        if (p.id !== activePaneId) return p;
+        return { ...p, isRunning: false, streamingState: null };
+      });
+      return { ...t, isRunning: false, panes: updatedPanes };
+    }));
+
     if (inputValue) {
       const prompt = `<span style="color:#4ade80;font-weight:bold">${tab?.shellState.env['USER'] || 'user'}@linux-box</span>:<span style="color:#60a5fa;font-weight:bold">~</span>$ ${inputValue}^C`;
       addLine('input', prompt, true);
@@ -212,6 +391,7 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     const tab = tabs.find(t => t.id === activeTabId);
     if (!tab) return;
+    const activePane = tab.panes?.find(p => p.id === tab.activePaneId) || tab;
 
     // Ctrl+C
     if (e.ctrlKey && e.key === 'c') {
@@ -223,14 +403,19 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
     // Ctrl+L
     if (e.ctrlKey && e.key === 'l') {
       e.preventDefault();
-      setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, lines: [] } : t));
+      setTabs(prev => prev.map(t => {
+        if (t.id !== activeTabId) return t;
+        const activePaneId = t.activePaneId || t.panes?.[0]?.id;
+        const updatedPanes = (t.panes || []).map(p => p.id === activePaneId ? { ...p, lines: [] } : p);
+        return { ...t, lines: [], panes: updatedPanes };
+      }));
       return;
     }
 
     // Tab completion
     if (e.key === 'Tab') {
       e.preventDefault();
-      const completions = getCompletions(inputValue, tab.shellState, vfs);
+      const completions = getCompletions(inputValue, activePane.shellState, vfs);
       if (completions.length === 1) {
         const parts = inputValue.split(/\s+/);
         parts[parts.length - 1] = completions[0];
@@ -244,7 +429,7 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
     // Up arrow - history
     if (e.key === 'ArrowUp') {
       e.preventDefault();
-      const history = tab.shellState.history;
+      const history = activePane.shellState.history;
       if (history.length === 0) return;
       const newIdx = historyIndex === -1 ? history.length - 1 : Math.max(0, historyIndex - 1);
       setHistoryIndex(newIdx);
@@ -255,7 +440,7 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
     // Down arrow - history
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      const history = tab.shellState.history;
+      const history = activePane.shellState.history;
       if (historyIndex === -1) return;
       const newIdx = historyIndex + 1;
       if (newIdx >= history.length) {
@@ -272,32 +457,72 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
   // Nano operations
   const getNanoState = useCallback((): NanoState | null => {
     const tab = tabs.find(t => t.id === activeTabId);
-    return tab?.nanoState ?? null;
+    if (!tab) return null;
+    const activePane = tab.panes?.find(p => p.id === tab.activePaneId);
+    return activePane?.nanoState ?? tab.nanoState ?? null;
   }, [tabs, activeTabId]);
 
   const setNanoState = useCallback((state: NanoState | null) => {
-    setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, nanoState: state } : t));
+    setTabs(prev => prev.map(t => {
+      if (t.id !== activeTabId) return t;
+      const activePaneId = t.activePaneId || t.panes?.[0]?.id;
+      const updatedPanes = (t.panes || []).map(p => p.id === activePaneId ? { ...p, nanoState: state } : p);
+      return { ...t, nanoState: state, panes: updatedPanes };
+    }));
   }, [activeTabId]);
 
   const saveNano = useCallback(() => {
     const tab = tabs.find(t => t.id === activeTabId);
-    if (!tab?.nanoState) return;
-    vfs.writeFile(tab.nanoState.filename, tab.nanoState.content);
-    setTabs(prev => prev.map(t => t.id === activeTabId ? {
-      ...t,
-      nanoState: t.nanoState ? { ...t.nanoState, modified: false } : null,
-    } : t));
-    addLine('system', `[ Wrote ${tab.nanoState.content.split('\n').length} lines to ${tab.nanoState.filename} ]`);
+    if (!tab) return;
+    const activePane = tab.panes?.find(p => p.id === tab.activePaneId) || tab;
+    if (!activePane?.nanoState) return;
+    vfs.writeFile(activePane.nanoState.filename, activePane.nanoState.content);
+    setTabs(prev => prev.map(t => {
+      if (t.id !== activeTabId) return t;
+      const activePaneId = t.activePaneId || t.panes?.[0]?.id;
+      const updatedPanes = (t.panes || []).map(p => {
+        if (p.id !== activePaneId || !p.nanoState) return p;
+        return { ...p, nanoState: { ...p.nanoState, modified: false } };
+      });
+      return {
+        ...t,
+        nanoState: t.nanoState ? { ...t.nanoState, modified: false } : null,
+        panes: updatedPanes,
+      };
+    }));
+    addLine('system', `[ Wrote ${activePane.nanoState.content.split('\n').length} lines to ${activePane.nanoState.filename} ]`);
     refreshVFS();
   }, [tabs, activeTabId, vfs, addLine, refreshVFS]);
 
   const exitNano = useCallback(() => {
-    setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, nanoState: null } : t));
+    setTabs(prev => prev.map(t => {
+      if (t.id !== activeTabId) return t;
+      const activePaneId = t.activePaneId || t.panes?.[0]?.id;
+      const updatedPanes = (t.panes || []).map(p => p.id === activePaneId ? { ...p, nanoState: null } : p);
+      return { ...t, nanoState: null, panes: updatedPanes };
+    }));
   }, [activeTabId]);
 
   const changeDirectory = useCallback((path: string) => {
     setTabs(prev => prev.map(t => {
       if (t.id !== activeTabId) return t;
+      const activePaneId = t.activePaneId || t.panes?.[0]?.id;
+      const updatedPanes = (t.panes || []).map(p => {
+        if (p.id !== activePaneId) return p;
+        return {
+          ...p,
+          shellState: {
+            ...p.shellState,
+            previousDir: p.shellState.cwd,
+            cwd: path,
+            env: {
+              ...p.shellState.env,
+              PWD: path,
+              OLDPWD: p.shellState.cwd,
+            },
+          },
+        };
+      });
       return {
         ...t,
         shellState: {
@@ -310,6 +535,7 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
             OLDPWD: t.shellState.cwd,
           },
         },
+        panes: updatedPanes,
       };
     }));
   }, [activeTabId]);
@@ -318,16 +544,20 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
     const node = vfs.getNode(filePath, true);
     setTabs(prev => prev.map(t => {
       if (t.id !== activeTabId) return t;
+      const activePaneId = t.activePaneId || t.panes?.[0]?.id;
+      const newNano: NanoState = {
+        filename: filePath,
+        content: node?.content ?? '',
+        cursorLine: 1,
+        cursorCol: 1,
+        modified: false,
+        scrollOffset: 0,
+      };
+      const updatedPanes = (t.panes || []).map(p => p.id === activePaneId ? { ...p, nanoState: newNano } : p);
       return {
         ...t,
-        nanoState: {
-          filename: filePath,
-          content: node?.content ?? '',
-          cursorLine: 1,
-          cursorCol: 1,
-          modified: false,
-          scrollOffset: 0,
-        },
+        nanoState: newNano,
+        panes: updatedPanes,
       };
     }));
   }, [activeTabId, vfs]);
@@ -335,47 +565,76 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
   // Vim operations
   const getVimState = useCallback((): VimState | null => {
     const tab = tabs.find(t => t.id === activeTabId);
-    return tab?.vimState ?? null;
+    if (!tab) return null;
+    const activePane = tab.panes?.find(p => p.id === tab.activePaneId);
+    return activePane?.vimState ?? tab.vimState ?? null;
   }, [tabs, activeTabId]);
 
   const setVimState = useCallback((state: VimState | null) => {
-    setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, vimState: state } : t));
+    setTabs(prev => prev.map(t => {
+      if (t.id !== activeTabId) return t;
+      const activePaneId = t.activePaneId || t.panes?.[0]?.id;
+      const updatedPanes = (t.panes || []).map(p => p.id === activePaneId ? { ...p, vimState: state } : p);
+      return { ...t, vimState: state, panes: updatedPanes };
+    }));
   }, [activeTabId]);
 
   const saveVim = useCallback((newContent: string) => {
     const tab = tabs.find(t => t.id === activeTabId);
-    if (!tab?.vimState) return;
-    vfs.writeFile(tab.vimState.filename, newContent);
-    setTabs(prev => prev.map(t => t.id === activeTabId ? {
-      ...t,
-      vimState: t.vimState ? { ...t.vimState, content: newContent, modified: false } : null,
-    } : t));
+    if (!tab) return;
+    const activePane = tab.panes?.find(p => p.id === tab.activePaneId) || tab;
+    const currentVim = activePane?.vimState || tab.vimState;
+    if (!currentVim) return;
+    vfs.writeFile(currentVim.filename, newContent);
+    setTabs(prev => prev.map(t => {
+      if (t.id !== activeTabId) return t;
+      const activePaneId = t.activePaneId || t.panes?.[0]?.id;
+      const updatedPanes = (t.panes || []).map(p => {
+        if (p.id !== activePaneId || !p.vimState) return p;
+        return { ...p, vimState: { ...p.vimState, content: newContent, modified: false } };
+      });
+      return {
+        ...t,
+        vimState: t.vimState ? { ...t.vimState, content: newContent, modified: false } : null,
+        panes: updatedPanes,
+      };
+    }));
     refreshVFS();
   }, [tabs, activeTabId, vfs, refreshVFS]);
 
   const exitVim = useCallback(() => {
-    setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, vimState: null } : t));
+    setTabs(prev => prev.map(t => {
+      if (t.id !== activeTabId) return t;
+      const activePaneId = t.activePaneId || t.panes?.[0]?.id;
+      const updatedPanes = (t.panes || []).map(p => p.id === activePaneId ? { ...p, vimState: null } : p);
+      return { ...t, vimState: null, panes: updatedPanes };
+    }));
   }, [activeTabId]);
 
   const openInVim = useCallback((filePath: string) => {
     const node = vfs.getNode(filePath, true);
     setTabs(prev => prev.map(t => {
       if (t.id !== activeTabId) return t;
+      const activePaneId = t.activePaneId || t.panes?.[0]?.id;
+      const newVim: VimState = {
+        filename: filePath,
+        content: node?.content ?? '',
+        mode: 'NORMAL',
+        cursorLine: 0,
+        cursorCol: 0,
+        modified: false,
+      };
+      const updatedPanes = (t.panes || []).map(p => p.id === activePaneId ? { ...p, vimState: newVim } : p);
       return {
         ...t,
-        vimState: {
-          filename: filePath,
-          content: node?.content ?? '',
-          mode: 'NORMAL',
-          cursorLine: 0,
-          cursorCol: 0,
-          modified: false,
-        },
+        vimState: newVim,
+        panes: updatedPanes,
       };
     }));
   }, [activeTabId, vfs]);
 
   const activeTab = getActiveTab();
+  const currentActivePane = activeTab?.panes?.find(p => p.id === activeTab.activePaneId) || activeTab;
 
   return {
     tabs,
@@ -385,6 +644,10 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
     addTab,
     closeTab,
     switchTab,
+    splitTab,
+    closePane,
+    setActivePane,
+    setStreamingState,
     handleInput,
     handleSubmit,
     handleKeyDown,
@@ -400,7 +663,7 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
     changeDirectory,
     openInNano,
     openInVim,
-    shellState: activeTab?.shellState ?? createShellState(),
-    isRunning: activeTab?.isRunning ?? false,
+    shellState: currentActivePane?.shellState ?? createShellState(),
+    isRunning: currentActivePane?.isRunning ?? false,
   };
 }

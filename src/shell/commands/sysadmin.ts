@@ -4,6 +4,7 @@ import type { ShellState, CommandResult } from '../../types';
 import type { VirtualFileSystem } from '../../vfs/fileSystem';
 import { getDockerState } from './docker';
 import { getUfwState } from './security';
+import { resolveHostname } from './networkCrypto';
 
 const SYS_STORAGE_KEY = 'linux-sim-sysadmin';
 
@@ -476,9 +477,14 @@ export function registerSysadminCommands() {
       return { stdout: '', stderr: 'curl: try \'curl --help\' for more information', exitCode: 2 };
     }
 
+    // Resolve domain/host via /etc/hosts
+    const hostPart = targetUrl.replace(/^[a-zA-Z]+:\/\//, '').split(/[:/]/)[0];
+    const resolved = resolveHostname(hostPart, vfs);
+    const isLocal = resolved.ip === '127.0.0.1' || resolved.ip === '127.0.1.1';
+
     // Check UFW firewall for target port if local
-    let portMatch = targetUrl.match(/(?:localhost|127\.0\.0\.1):(\d+)/);
-    let targetPort = portMatch ? parseInt(portMatch[1], 10) : (targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1') ? 80 : 0);
+    let portMatch = targetUrl.match(/(?:localhost|127\.0\.0\.1|[a-zA-Z0-9.-]+):(\d+)/);
+    let targetPort = portMatch ? parseInt(portMatch[1], 10) : (isLocal || targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1') ? 80 : 0);
 
     const ufw = getUfwState();
     if (ufw.enabled && targetPort > 0) {
@@ -534,6 +540,7 @@ body { width: 35em; margin: 0 auto; font-family: Tahoma, Verdana, Arial, sans-se
 
     // Router for local simulated addresses
     const isLocalhost80 =
+      isLocal ||
       targetUrl === 'http://localhost' ||
       targetUrl === 'http://localhost:80' ||
       targetUrl === 'http://127.0.0.1' ||

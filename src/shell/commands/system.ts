@@ -1,6 +1,7 @@
 import { registry } from '../commandRegistry';
 import type { CommandResult } from '../../types';
 import { getRunningServicesList } from './sysadmin';
+import { resolveHostname } from './networkCrypto';
 
 export function registerSystemCommands() {
   // neofetch
@@ -313,15 +314,41 @@ export function registerSystemCommands() {
   // kill
   registry.register({
     name: 'kill',
-    description: 'Send signal to a process',
-    usage: 'kill <pid>',
+    description: 'Send signal to a process or background job',
+    usage: 'kill [%job_id | pid]',
     flags: [],
-    handler: (args) => {
+    handler: (args, _flags, shellState) => {
       if (args.length === 0) {
-        return { stdout: '', stderr: 'kill: usage: kill <pid>', exitCode: 1 };
+        return { stdout: '', stderr: 'kill: usage: kill <pid> or kill %<job>', exitCode: 1 };
       }
-      const pid = args[0];
-      return { stdout: '', stderr: `kill: (${pid}): No such process`, exitCode: 1 };
+      const target = args[0];
+
+      // Check background jobs
+      if (shellState.jobs && shellState.jobs.length > 0) {
+        let cleanId: number | null = null;
+        if (target.startsWith('%')) {
+          cleanId = parseInt(target.slice(1), 10);
+        } else if (/^\d+$/.test(target)) {
+          cleanId = parseInt(target, 10);
+        }
+
+        if (cleanId !== null) {
+          const jobIndex = shellState.jobs.findIndex(j => j.id === cleanId || j.pid === cleanId);
+          if (jobIndex !== -1) {
+            const [job] = shellState.jobs.splice(jobIndex, 1);
+            return { stdout: `[${job.id}]+  Terminated: 15          ${job.command}`, stderr: '', exitCode: 0 };
+          }
+        }
+      }
+
+      // Check simulated services
+      const runningServices = getRunningServicesList();
+      const srv = runningServices.find(s => String(s.pid) === target || s.name === target);
+      if (srv) {
+        return { stdout: '', stderr: '', exitCode: 0 };
+      }
+
+      return { stdout: '', stderr: `kill: (${target}): No such process`, exitCode: 1 };
     },
   });
 
@@ -331,7 +358,7 @@ export function registerSystemCommands() {
     description: 'Send ICMP echo requests to a host',
     usage: 'ping <host>',
     flags: [],
-    handler: async (args, _flags, _shellState, _vfs, _stdin, context): Promise<CommandResult> => {
+    handler: async (args, _flags, _shellState, vfs, _stdin, context): Promise<CommandResult> => {
       if (!context) return { stdout: '', stderr: 'ping: no context', exitCode: 1 };
       const host = args[0];
       if (!host) return { stdout: '', stderr: 'ping: usage error: Destination address required', exitCode: 1 };
@@ -340,7 +367,8 @@ export function registerSystemCommands() {
       context.onCtrlC(() => { aborted = true; });
       context.setRunning(true);
 
-      const ip = '93.184.216.34';
+      const resolved = resolveHostname(host, vfs);
+      const ip = resolved.ip;
       context.addLine('output', `PING ${host} (${ip}): 56 data bytes`);
 
       let sent = 0;
