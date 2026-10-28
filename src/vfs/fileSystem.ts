@@ -6,6 +6,7 @@ import {
   getParentPath,
   getBasename,
   joinPath,
+  resolvePath,
 } from './pathResolver';
 import { createInitialFileSystem } from './initialData';
 
@@ -30,24 +31,109 @@ export class VirtualFileSystem {
 
   /**
    * Get a node by its absolute path.
+   * If followSymlinks is true, transparently resolves symlink nodes to their target.
    */
-  getNode(path: string): VFSNode | null {
+  getNode(path: string, followSymlinks: boolean = true, depth: number = 0): VFSNode | null {
+    if (depth > 12) return null; // recursion loop guard
     const normalized = normalizePath(path);
     if (normalized === '/') return this.root;
 
     const parts = splitPath(normalized);
     let current: VFSNode = this.root;
+    let currentPath = '';
 
-    for (const part of parts) {
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const isLast = i === parts.length - 1;
+
+      // If current node is a symlink, resolve it to its target directory
+      if (current.type === 'symlink') {
+        const target = current.target ? resolvePath(current.target, currentPath, '/home/user') : null;
+        if (!target) return null;
+        const targetNode = this.getNode(target, true, depth + 1);
+        if (!targetNode) return null;
+        current = targetNode;
+      }
+
       if (current.type !== 'dir' || !current.children) {
         return null;
       }
+
       const child = current.children.get(part);
       if (!child) return null;
+
+      currentPath = currentPath === '/' ? `/${part}` : `${currentPath}/${part}`;
+
+      if (isLast) {
+        if (child.type === 'symlink' && followSymlinks) {
+          const parentOfLink = getParentPath(currentPath);
+          const target = child.target ? resolvePath(child.target, parentOfLink, '/home/user') : null;
+          if (!target) return null;
+          return this.getNode(target, true, depth + 1);
+        }
+        return child;
+      }
+
       current = child;
     }
 
     return current;
+  }
+
+  /**
+   * Create a symbolic link pointing to targetPath.
+   */
+  createSymlink(
+    linkPath: string,
+    targetPath: string,
+    owner: string = 'user',
+  ): CommandResult {
+    const normalized = normalizePath(linkPath);
+    const parentPath = getParentPath(normalized);
+    const linkName = getBasename(normalized);
+
+    const parent = this.getNode(parentPath, true);
+    if (!parent) {
+      return {
+        stdout: '',
+        stderr: `ln: failed to create symbolic link '${linkPath}': No such file or directory`,
+        exitCode: 1,
+      };
+    }
+    if (parent.type !== 'dir' || !parent.children) {
+      return {
+        stdout: '',
+        stderr: `ln: failed to create symbolic link '${linkPath}': Not a directory`,
+        exitCode: 1,
+      };
+    }
+
+    if (parent.children.has(linkName)) {
+      return {
+        stdout: '',
+        stderr: `ln: failed to create symbolic link '${linkPath}': File exists`,
+        exitCode: 1,
+      };
+    }
+
+    const now = new Date();
+    const node: VFSNode = {
+      name: linkName,
+      type: 'symlink',
+      target: targetPath,
+      permissions: 'rwxrwxrwx',
+      owner,
+      group: owner,
+      size: targetPath.length,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    parent.children.set(linkName, node);
+    parent.updatedAt = now;
+    this.save();
+
+    return { stdout: '', stderr: '', exitCode: 0 };
   }
 
   /**
@@ -559,6 +645,33 @@ export class VirtualFileSystem {
     }
   }
 
+  // ─── Snapshots ────────────────────────────────────────────────
+  /**
+   * Export the entire Virtual File System state as a JSON string snapshot.
+   */
+  exportSnapshot(): string {
+    return JSON.stringify(this.serialize(), null, 2);
+  }
+
+  /**
+   * Import and restore a VFS snapshot from a JSON string.
+   */
+  importSnapshot(jsonString: string): boolean {
+    try {
+      const parsed = JSON.parse(jsonString);
+      const root = VirtualFileSystem.deserialize(parsed);
+      this.root = root;
+      if (this.saveTimeout) {
+        clearTimeout(this.saveTimeout);
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.serialize()));
+      return true;
+    } catch (e) {
+      console.error('Failed to import VFS snapshot', e);
+      return false;
+    }
+  }
+
   // ─── Serialization ────────────────────────────────────────────
 
   /**
@@ -582,6 +695,10 @@ export class VirtualFileSystem {
 
     if (node.type === 'file') {
       serialized.content = node.content ?? '';
+    }
+
+    if (node.type === 'symlink') {
+      serialized.target = node.target;
     }
 
     if (node.type === 'dir' && node.children) {
@@ -611,6 +728,10 @@ export class VirtualFileSystem {
 
     if (data.type === 'file') {
       node.content = data.content ?? '';
+    }
+
+    if (data.type === 'symlink') {
+      node.target = data.target;
     }
 
     if (data.type === 'dir' && data.children) {
@@ -751,6 +872,10 @@ export class VirtualFileSystem {
 
     if (node.type === 'file') {
       clone.content = node.content ?? '';
+    }
+
+    if (node.type === 'symlink') {
+      clone.target = node.target;
     }
 
     if (node.type === 'dir' && node.children) {

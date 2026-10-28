@@ -24,6 +24,24 @@ export function registerUtilityCommands() {
     handler: () => ({ stdout: '__CLEAR__', stderr: '', exitCode: 0 }),
   });
 
+  // bash
+  registry.register({
+    name: 'bash',
+    description: 'GNU Bourne-Again SHell and script interpreter',
+    usage: 'bash [script.sh] [args...]',
+    flags: [],
+    handler: () => ({ stdout: 'LinuxSim bash, version 5.2.15(1)-release', stderr: '', exitCode: 0 }),
+  });
+
+  // sh
+  registry.register({
+    name: 'sh',
+    description: 'POSIX compliant command interpreter',
+    usage: 'sh [script.sh] [args...]',
+    flags: [],
+    handler: () => ({ stdout: 'LinuxSim sh, version 5.2.15', stderr: '', exitCode: 0 }),
+  });
+
   // env
   registry.register({
     name: 'env',

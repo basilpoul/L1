@@ -85,17 +85,21 @@ export function registerNavigationCommands() {
         ? resolvePath(args[0], shellState.cwd, shellState.env['HOME'] || '/home/user')
         : shellState.cwd;
 
-      const node = vfs.getNode(targetPath);
+      const node = vfs.getNode(targetPath, false);
       if (!node) {
         return { stdout: '', stderr: `ls: cannot access '${args[0] || targetPath}': No such file or directory`, exitCode: 2 };
       }
 
-      if (node.type === 'file') {
+      if (node.type === 'file' || node.type === 'symlink') {
+        const displayName = node.type === 'symlink'
+          ? `${colorize(node.name, '#22d3ee')} -> ${node.target || ''}`
+          : (node.permissions.includes('x') ? colorize(node.name, '#4ade80') : node.name);
+
         if (longFormat) {
-          const line = `${formatPermissions(node)}  ${node.owner.padEnd(5)}  ${node.group.padEnd(5)}  ${formatSize(node.size)}  ${formatDate(node.updatedAt)}  ${node.name}`;
+          const line = `${formatPermissions(node)}  ${node.owner.padEnd(5)}  ${node.group.padEnd(5)}  ${formatSize(node.size)}  ${formatDate(node.updatedAt)}  ${displayName}`;
           return { stdout: line, stderr: '', exitCode: 0 };
         }
-        return { stdout: node.name, stderr: '', exitCode: 0 };
+        return { stdout: displayName, stderr: '', exitCode: 0 };
       }
 
       const children = vfs.listDirectory(targetPath);
@@ -112,8 +116,11 @@ export function registerNavigationCommands() {
         return { stdout: '', stderr: '', exitCode: 0 };
       }
 
-      const colorName = (n: VFSNode): string => {
+      const colorName = (n: VFSNode, isLong: boolean = false): string => {
         if (n.type === 'dir') return colorize(n.name, '#60a5fa');
+        if (n.type === 'symlink') {
+          return isLong ? `${colorize(n.name, '#22d3ee')} -> ${n.target || ''}` : colorize(n.name, '#22d3ee');
+        }
         if (n.permissions.includes('x')) return colorize(n.name, '#4ade80');
         return n.name;
       };
@@ -126,14 +133,14 @@ export function registerNavigationCommands() {
         }
         const lines = entries.map(e => {
           const perm = formatPermissions(e);
-          return `${perm}  ${e.owner.padEnd(5)}  ${e.group.padEnd(5)}  ${formatSize(e.size)}  ${formatDate(e.updatedAt)}  ${colorName(e)}`;
+          return `${perm}  ${e.owner.padEnd(5)}  ${e.group.padEnd(5)}  ${formatSize(e.size)}  ${formatDate(e.updatedAt)}  ${colorName(e, true)}`;
         });
         const totalLines = `total ${entries.length}`;
         const result = [totalLines, ...dotEntries, ...lines].join('\n');
         return { stdout: result, stderr: '', exitCode: 0 };
       }
 
-      const names = entries.map(colorName);
+      const names = entries.map(e => colorName(e, false));
       return { stdout: names.join('  '), stderr: '', exitCode: 0 };
     },
   });

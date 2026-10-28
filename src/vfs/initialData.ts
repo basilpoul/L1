@@ -151,7 +151,7 @@ export function createInitialFileSystem(): VFSNode {
     downloads,
     file(
       '.bashrc',
-      "# ~/.bashrc\nexport PATH=$PATH:/usr/local/bin\nexport EDITOR=nano\nalias ll='ls -la'\nalias gs='git status'\n\n# Custom prompt\nPS1='\\u@\\h:\\w\\$ '\n",
+      "# ~/.bashrc\nexport PATH=$PATH:/usr/local/bin\nexport EDITOR=nano\nalias ll='ls -la'\nalias gs='systemctl status'\n\n# Custom prompt\nPS1='\\u@\\h:\\w\\$ '\n",
     ),
     file(
       '.profile',

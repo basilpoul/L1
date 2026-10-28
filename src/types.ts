@@ -1,10 +1,11 @@
 // VFS Node types
 export interface VFSNode {
   name: string;
-  type: 'file' | 'dir';
+  type: 'file' | 'dir' | 'symlink';
   content?: string; // only for files
+  target?: string; // target path for symlinks
   children?: Map<string, VFSNode>; // only for directories
-  permissions: string; // e.g. 'rwxr-xr-x'
+  permissions: string; // e.g. 'rwxr-xr-x' or 'lrwxrwxrwx'
   owner: string; // 'user' | 'root'
   group: string; // 'user' | 'root'
   size: number;
@@ -15,8 +16,9 @@ export interface VFSNode {
 // Serializable version for localStorage
 export interface SerializedVFSNode {
   name: string;
-  type: 'file' | 'dir';
+  type: 'file' | 'dir' | 'symlink';
   content?: string;
+  target?: string;
   children?: Record<string, SerializedVFSNode>;
   permissions: string;
   owner: string;
@@ -90,7 +92,7 @@ export interface Mission {
   id: string;
   title: string;
   description: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  difficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert';
   hint: string;
   validator: (vfs: any, history: string[]) => boolean;
   completed: boolean;

@@ -7,6 +7,7 @@ import { expandVariables } from './environment';
 import { registry } from './commandRegistry';
 import type { ExecutionContext } from './commandRegistry';
 import type { Pipeline, PipelineStage } from './parser';
+import { executeScriptFile } from './scriptRunner';
 
 /**
  * Expand aliases in the input string.
@@ -171,9 +172,34 @@ async function executeStage(
     return { stdout: arg === '-' ? target : '', stderr: '', exitCode: 0 };
   }
 
+  // Built-in: bash / sh
+  if (cmdName === 'bash' || cmdName === 'sh') {
+    if (command.args.length > 0) {
+      const scriptFile = command.args[0];
+      const scriptArgs = command.args.slice(1);
+      return await executeScriptFile(scriptFile, scriptArgs, shellState, vfs, context, true);
+    }
+    return {
+      stdout: 'LinuxSim bash, version 5.2.15(1)-release (x86_64-pc-linux-gnu)',
+      stderr: '',
+      exitCode: 0,
+    };
+  }
+
+  // Direct script execution: ./script.sh, /path/script.sh, ~/script.sh
+  if (cmdName.startsWith('./') || cmdName.startsWith('/') || cmdName.startsWith('~/')) {
+    return await executeScriptFile(cmdName, command.args, shellState, vfs, context, false);
+  }
+
   // Look up command in registry
   const cmdInfo = registry.get(cmdName);
   if (!cmdInfo) {
+    // Check if an executable script exists in /bin
+    const binNode = vfs.getNode(`/bin/${cmdName}`, true);
+    if (binNode && binNode.type === 'file' && binNode.content) {
+      return await executeScriptFile(`/bin/${cmdName}`, command.args, shellState, vfs, context, false);
+    }
+
     return {
       stdout: '',
       stderr: `${cmdName}: command not found`,

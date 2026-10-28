@@ -1,5 +1,6 @@
 import { registry } from '../commandRegistry';
 import type { CommandResult } from '../../types';
+import { getRunningServicesList } from './sysadmin';
 
 export function registerSystemCommands() {
   // neofetch
@@ -226,11 +227,13 @@ export function registerSystemCommands() {
     usage: 'ps [aux]',
     flags: [],
     handler: (_args, flags) => {
+      const runningServices = getRunningServicesList();
+
       const lines = [
         '  PID TTY          TIME CMD',
         '    1 ?        00:00:01 systemd',
-        '  421 ?        00:00:00 sshd',
         '  892 ?        00:00:02 NetworkManager',
+        ...runningServices.map(s => ` ${String(s.pid).padStart(4)} ?        00:00:01 ${s.name}`),
         ' 1023 pts/0    00:00:00 bash',
         ' 1102 pts/0    00:00:00 ps',
       ];
@@ -239,8 +242,10 @@ export function registerSystemCommands() {
         const auxLines = [
           'USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND',
           'root         1  0.0  0.1 171236 12304 ?        Ss   10:15   0:01 /sbin/init',
-          'root       421  0.0  0.0  72304  5636 ?        Ss   10:15   0:00 sshd: /usr/sbin/sshd',
           'root       892  0.0  0.2 549612 20480 ?        Ssl  10:15   0:02 /usr/sbin/NetworkManager',
+          ...runningServices.map(s =>
+            `${s.user.padEnd(8)}  ${String(s.pid).padStart(4)}  0.1  0.3  68924  8192 ?        Ss   10:15   0:00 ${s.command}`
+          ),
           'user      1023  0.0  0.0  25540  5748 pts/0    Ss   10:18   0:00 -bash',
           'user      1102  0.0  0.0  44396  3456 pts/0    R+   10:25   0:00 ps aux',
         ];
@@ -261,6 +266,8 @@ export function registerSystemCommands() {
       const now = new Date();
       const h = String(now.getHours()).padStart(2, '0');
       const m = String(now.getMinutes()).padStart(2, '0');
+      const runningServices = getRunningServicesList();
+
       const lines = [
         `top - ${h}:${m}:00 up 5:32,  1 user,  load average: 0.12, 0.08, 0.05`,
         'Tasks:  86 total,   1 running,  85 sleeping,   0 stopped,   0 zombie',
@@ -271,7 +278,9 @@ export function registerSystemCommands() {
         '  PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND',
         '  892 root      20   0  549612  20480  15360 S   1.2   0.2   0:02.34 NetworkMa+',
         '    1 root      20   0  171236  12304   8960 S   0.0   0.1   0:01.12 systemd',
-        '  421 root      20   0   72304   5636   4864 S   0.0   0.0   0:00.45 sshd',
+        ...runningServices.map(s =>
+          ` ${String(s.pid).padStart(4)} ${s.user.padEnd(9)} 20   0   72304   5636   4864 S   0.1   0.1   0:00.12 ${s.name}`
+        ),
         ' 1023 user      20   0   25540   5748   4608 S   0.0   0.0   0:00.22 bash',
         ' 1102 user      20   0   44396   3456   3072 R   0.0   0.0   0:00.01 top',
       ];

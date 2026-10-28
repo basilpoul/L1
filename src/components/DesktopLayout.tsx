@@ -122,6 +122,33 @@ export const DesktopLayout: React.FC = () => {
     refresh();
   };
 
+  const handleExportVFS = () => {
+    const jsonStr = vfs.exportSnapshot();
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'linuxsim-snapshot.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setCelebrationToast('💾 Exported VFS snapshot to linuxsim-snapshot.json');
+    setTimeout(() => setCelebrationToast(null), 3000);
+  };
+
+  const handleImportVFS = (jsonString: string) => {
+    const success = vfs.importSnapshot(jsonString);
+    if (success) {
+      refresh();
+      setCelebrationToast('📥 Successfully imported VFS snapshot!');
+      setTimeout(() => setCelebrationToast(null), 3000);
+    } else {
+      setCelebrationToast('❌ Failed to import snapshot: Invalid JSON format');
+      setTimeout(() => setCelebrationToast(null), 3000);
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0f111a] text-slate-100 select-none">
       {/* Top Status Bar */}
@@ -129,6 +156,8 @@ export const DesktopLayout: React.FC = () => {
         cwd={terminal.shellState.cwd}
         onReset={handleResetAll}
         onOpenCheatSheet={() => setIsCheatSheetOpen(true)}
+        onExportVFS={handleExportVFS}
+        onImportVFS={handleImportVFS}
       />
 
       {/* Main Workspace */}
@@ -201,6 +230,8 @@ export const DesktopLayout: React.FC = () => {
               version={version}
               cwd={terminal.shellState.cwd}
               onNavigate={handleExplorerNavigate}
+              onOpenNano={(path) => terminal.openInNano(path)}
+              onRefresh={refresh}
             />
           </aside>
         )}

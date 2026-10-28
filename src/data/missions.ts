@@ -1,5 +1,6 @@
 import type { Mission } from '../types';
-import { VirtualFileSystem } from '../vfs/fileSystem';
+import type { VirtualFileSystem } from '../vfs/fileSystem';
+import { isServiceRunning } from '../shell/commands/sysadmin';
 
 /**
  * 15 progressive missions that teach Linux fundamentals.
@@ -262,6 +263,165 @@ export const missions: Mission[] = [
       const node = vfs.getNode('/home/user/projects/config.json');
       if (!node || node.type !== 'file' || !node.content) return false;
       return node.content.includes('"port": 8080');
+    },
+  },
+
+  // ── Expert (16-25): SysAdmin & Scripting ──────────────────────
+
+  {
+    id: 'mission-16',
+    title: 'Column Extraction',
+    description:
+      'Use `cut` or `awk` on /etc/passwd to extract all usernames and save them to ~/users.txt.',
+    difficulty: 'expert',
+    hint: "cut -d: -f1 /etc/passwd > ~/users.txt   or   awk -F: '{print $1}' /etc/passwd > ~/users.txt",
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const node = vfs.getNode('/home/user/users.txt', true);
+      if (!node || node.type !== 'file' || !node.content) return false;
+      const content = node.content;
+      return content.includes('root') && content.includes('user') && !content.includes('/bin/bash');
+    },
+  },
+
+  {
+    id: 'mission-17',
+    title: 'Stream Editing',
+    description:
+      'Use `sed` to replace all instances of WARN with WARNING in /var/log/syslog and save to ~/cleaned.log.',
+    difficulty: 'expert',
+    hint: "sed 's/WARN/WARNING/g' /var/log/syslog > ~/cleaned.log",
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const node = vfs.getNode('/home/user/cleaned.log', true);
+      if (!node || node.type !== 'file' || !node.content) return false;
+      const lines = node.content.split('\n');
+      return lines.length > 5 && node.content.includes('WARNING');
+    },
+  },
+
+  {
+    id: 'mission-18',
+    title: 'Symbolic Links',
+    description:
+      'Create a symbolic link at ~/logs pointing to /var/log using `ln -s`.',
+    difficulty: 'expert',
+    hint: 'ln -s /var/log ~/logs',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const node = vfs.getNode('/home/user/logs', false);
+      if (!node) return false;
+      return node.type === 'symlink' && (node.target === '/var/log' || node.target?.includes('var/log') === true);
+    },
+  },
+
+  {
+    id: 'mission-19',
+    title: 'Archive & Backup',
+    description:
+      'Bundle /home/user/projects into ~/backup.tar.gz using `tar`.',
+    difficulty: 'expert',
+    hint: 'tar -czvf ~/backup.tar.gz ~/projects',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const node = vfs.getNode('/home/user/backup.tar.gz', true);
+      if (!node || node.type !== 'file' || !node.content) return false;
+      return node.content.startsWith('TAR_ARCHIVE_V1:') && node.content.includes('projects');
+    },
+  },
+
+  {
+    id: 'mission-20',
+    title: 'Service Recovery',
+    description:
+      'Diagnose why `curl http://localhost:80` fails, start the nginx service via `sudo systemctl start nginx`, and verify its status.',
+    difficulty: 'expert',
+    hint: 'sudo systemctl start nginx && systemctl status nginx',
+    completed: false,
+    validator: (_vfs: VirtualFileSystem, history: string[]): boolean => {
+      const isRunning = isServiceRunning('nginx');
+      const hasSystemctlCmd = history.some(cmd => cmd.includes('systemctl') && cmd.includes('nginx'));
+      return isRunning && hasSystemctlCmd;
+    },
+  },
+
+  {
+    id: 'mission-21',
+    title: 'Package Management & JSON',
+    description:
+      'Install jq using `sudo apt install jq`, fetch https://api.linuxsim.local/users with `curl`, and extract the names to ~/api_users.txt.',
+    difficulty: 'expert',
+    hint: "sudo apt install jq && curl -s https://api.linuxsim.local/users | jq '.[].name' > ~/api_users.txt",
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const node = vfs.getNode('/home/user/api_users.txt', true);
+      if (!node || node.type !== 'file' || !node.content) return false;
+      return node.content.includes('Linus Torvalds') && node.content.includes('Dennis Ritchie');
+    },
+  },
+
+  {
+    id: 'mission-22',
+    title: 'Writing a Bash Script',
+    description:
+      'Create ~/sys_check.sh, make it executable (`chmod +x`), and have it output the current user and uptime into ~/report.txt.',
+    difficulty: 'expert',
+    hint: "echo -e '#!/bin/bash\\nwhoami > ~/report.txt\\nuptime >> ~/report.txt' > ~/sys_check.sh && chmod +x ~/sys_check.sh && ./sys_check.sh",
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const scriptNode = vfs.getNode('/home/user/sys_check.sh', false);
+      const reportNode = vfs.getNode('/home/user/report.txt', true);
+      if (!scriptNode || scriptNode.type !== 'file') return false;
+      if (!scriptNode.permissions.includes('x')) return false;
+      if (!reportNode || !reportNode.content) return false;
+      return reportNode.content.length > 5;
+    },
+  },
+
+  {
+    id: 'mission-23',
+    title: 'Bash Loops & Args',
+    description:
+      'Write and run a script ~/greet.sh that takes an argument $1 and echoes "Hello, $1".',
+    difficulty: 'expert',
+    hint: 'echo \'echo "Hello, $1"\' > ~/greet.sh && bash ~/greet.sh World',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, history: string[]): boolean => {
+      const scriptNode = vfs.getNode('/home/user/greet.sh', true);
+      if (!scriptNode || !scriptNode.content) return false;
+      const hasArgPattern = scriptNode.content.includes('$1') || scriptNode.content.includes('Hello');
+      const hasRunCmd = history.some(cmd => cmd.includes('greet.sh'));
+      return hasArgPattern && hasRunCmd;
+    },
+  },
+
+  {
+    id: 'mission-24',
+    title: 'Persistent Environment',
+    description:
+      "Add custom alias `alias ports='netstat -tuln'` to ~/.bashrc.",
+    difficulty: 'expert',
+    hint: "echo \"alias ports='netstat -tuln'\" >> ~/.bashrc",
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const bashrc = vfs.getNode('/home/user/.bashrc', true);
+      if (!bashrc || !bashrc.content) return false;
+      return bashrc.content.includes('alias ports=');
+    },
+  },
+
+  {
+    id: 'mission-25',
+    title: 'Security Audit',
+    description:
+      'Inspect open ports with `netstat -tuln` and save the output to ~/audit.txt.',
+    difficulty: 'expert',
+    hint: 'netstat -tuln > ~/audit.txt',
+    completed: false,
+    validator: (vfs: VirtualFileSystem, _history: string[]): boolean => {
+      const auditNode = vfs.getNode('/home/user/audit.txt', true);
+      if (!auditNode || !auditNode.content) return false;
+      return auditNode.content.includes('Active Internet connections') || auditNode.content.includes('127.0.0.53:53') || auditNode.content.includes('LISTEN');
     },
   },
 ];

@@ -40,8 +40,17 @@ export const CheatSheetModal: React.FC<CheatSheetModalProps> = ({
     const nav = ['pwd', 'ls', 'cd', 'tree', 'find'];
     const files = ['mkdir', 'touch', 'rm', 'cp', 'mv'];
     const text = ['cat', 'echo', 'grep', 'head', 'tail', 'wc', 'sort', 'uniq', 'nano'];
+    const powerText = ['sed', 'awk', 'cut', 'tr', 'diff', 'jq'];
+    const archives = ['ln', 'tar', 'zip', 'unzip'];
+    const sysadmin = ['systemctl', 'netstat', 'ss', 'curl', 'wget', 'apt', 'apt-get', 'crontab', 'cowsay', 'figlet'];
     const perm = ['chmod', 'chown', 'sudo', 'whoami', 'id'];
     const sys = ['neofetch', 'uname', 'hostname', 'date', 'uptime', 'cal', 'df', 'du', 'free', 'ps', 'top', 'htop', 'kill', 'ping'];
+    const script = ['bash', 'sh'];
+
+    if (powerText.includes(name)) return 'Power Text';
+    if (archives.includes(name)) return 'Archives & Links';
+    if (sysadmin.includes(name)) return 'SysAdmin & Network';
+    if (script.includes(name)) return 'Scripting';
     if (nav.includes(name)) return 'Navigation';
     if (files.includes(name)) return 'File Ops';
     if (text.includes(name)) return 'Text & Pipes';
@@ -50,7 +59,19 @@ export const CheatSheetModal: React.FC<CheatSheetModalProps> = ({
     return 'Utilities';
   };
 
-  const categories = ['all', 'Navigation', 'File Ops', 'Text & Pipes', 'Permissions', 'System', 'Utilities'];
+  const categories = [
+    'all',
+    'Navigation',
+    'File Ops',
+    'Text & Pipes',
+    'Power Text',
+    'Archives & Links',
+    'SysAdmin & Network',
+    'Permissions',
+    'System',
+    'Scripting',
+    'Utilities',
+  ];
 
   const filteredCommands = useMemo(() => {
     const q = search.toLowerCase().trim();

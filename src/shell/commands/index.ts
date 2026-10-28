@@ -4,6 +4,9 @@ import { registerTextCommands } from './textProcessing';
 import { registerPermissionCommands } from './permissions';
 import { registerSystemCommands } from './system';
 import { registerUtilityCommands } from './utility';
+import { registerAdvancedTextCommands } from './advancedText';
+import { registerArchiveCommands } from './archives';
+import { registerSysadminCommands } from './sysadmin';
 
 let registered = false;
 
@@ -16,4 +19,7 @@ export function registerAllCommands() {
   registerPermissionCommands();
   registerSystemCommands();
   registerUtilityCommands();
+  registerAdvancedTextCommands();
+  registerArchiveCommands();
+  registerSysadminCommands();
 }

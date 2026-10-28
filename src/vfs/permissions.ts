@@ -214,6 +214,6 @@ export function checkPermission(
  * Format permissions with type prefix: 'drwxr-xr-x' for dirs, '-rwxr-xr-x' for files.
  */
 export function formatPermissions(node: VFSNode): string {
-  const prefix = node.type === 'dir' ? 'd' : '-';
+  const prefix = node.type === 'dir' ? 'd' : node.type === 'symlink' ? 'l' : '-';
   return prefix + node.permissions;
 }

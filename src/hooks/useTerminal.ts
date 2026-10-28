@@ -8,6 +8,28 @@ function genId(): string {
   return Math.random().toString(36).substring(2, 9);
 }
 
+function applyBashrc(shellState: ShellState, vfs: VirtualFileSystem) {
+  const bashrc = vfs.getNode('/home/user/.bashrc', true);
+  if (!bashrc || !bashrc.content) return;
+  const lines = bashrc.content.split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    // alias name='val' or alias name="val"
+    const aliasMatch = trimmed.match(/^alias\s+([A-Za-z0-9_-]+)=['"]?(.*?)['"]?$/);
+    if (aliasMatch) {
+      shellState.aliases[aliasMatch[1]] = aliasMatch[2];
+      continue;
+    }
+    // export VAR=val or export VAR="val"
+    const exportMatch = trimmed.match(/^export\s+([A-Za-z0-9_]+)=['"]?(.*?)['"]?$/);
+    if (exportMatch) {
+      shellState.env[exportMatch[1]] = exportMatch[2];
+      continue;
+    }
+  }
+}
+
 function createShellState(): ShellState {
   return {
     cwd: '/home/user',
@@ -20,7 +42,11 @@ function createShellState(): ShellState {
   };
 }
 
-function createTab(index: number): TerminalTab {
+function createTab(index: number, vfs?: VirtualFileSystem): TerminalTab {
+  const shellState = createShellState();
+  if (vfs) {
+    applyBashrc(shellState, vfs);
+  }
   const id = genId();
   return {
     id,
@@ -39,14 +65,14 @@ function createTab(index: number): TerminalTab {
         timestamp: new Date(),
       },
     ],
-    shellState: createShellState(),
+    shellState,
     isRunning: false,
     nanoState: null,
   };
 }
 
 export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
-  const [tabs, setTabs] = useState<TerminalTab[]>(() => [createTab(1)]);
+  const [tabs, setTabs] = useState<TerminalTab[]>(() => [createTab(1, vfs)]);
   const [activeTabId, setActiveTabId] = useState(() => tabs[0].id);
   const [inputValue, setInputValue] = useState('');
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -73,12 +99,12 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
 
   const addTab = useCallback(() => {
     tabCounterRef.current++;
-    const newTab = createTab(tabCounterRef.current);
+    const newTab = createTab(tabCounterRef.current, vfs);
     setTabs(prev => [...prev, newTab]);
     setActiveTabId(newTab.id);
     setInputValue('');
     setHistoryIndex(-1);
-  }, []);
+  }, [vfs]);
 
   const closeTab = useCallback((id: string) => {
     setTabs(prev => {
@@ -270,6 +296,24 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
     }));
   }, [activeTabId]);
 
+  const openInNano = useCallback((filePath: string) => {
+    const node = vfs.getNode(filePath, true);
+    setTabs(prev => prev.map(t => {
+      if (t.id !== activeTabId) return t;
+      return {
+        ...t,
+        nanoState: {
+          filename: filePath,
+          content: node?.content ?? '',
+          cursorLine: 1,
+          cursorCol: 1,
+          modified: false,
+          scrollOffset: 0,
+        },
+      };
+    }));
+  }, [activeTabId, vfs]);
+
   const activeTab = getActiveTab();
 
   return {
@@ -289,6 +333,7 @@ export function useTerminal(vfs: VirtualFileSystem, refreshVFS: () => void) {
     saveNano,
     exitNano,
     changeDirectory,
+    openInNano,
     shellState: activeTab?.shellState ?? createShellState(),
     isRunning: activeTab?.isRunning ?? false,
   };
