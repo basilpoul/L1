@@ -616,8 +616,96 @@ export const VimEditor: React.FC<VimEditorProps> = ({
       onKeyDown={handleKeyDown}
       onClick={() => containerRef.current?.focus()}
       className="flex flex-col h-full font-mono text-sm outline-none select-none cursor-text"
-      style={{ background: '#0f111a', color: '#c0caf5' }}
+      style={{ background: 'var(--theme-bg)', color: 'var(--theme-text)' }}
     >
+      {/* Touch-Friendly Vim Header & Quick Mode Controls */}
+      <div
+        className="flex items-center justify-between px-3 py-1.5 border-b text-xs shrink-0 overflow-x-auto gap-2"
+        style={{
+          background: 'var(--theme-elevated)',
+          borderColor: 'var(--theme-border-strong)',
+        }}
+      >
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="font-bold" style={{ color: 'var(--theme-accent)' }}>
+            VIM
+          </span>
+          <span className="opacity-30">·</span>
+          <span className="truncate max-w-[140px] sm:max-w-none">{baseName}</span>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0 font-sans">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMode('NORMAL');
+              setVisualStart(null);
+              setCommandBuffer('');
+              containerRef.current?.focus();
+            }}
+            className={`px-2 py-0.5 rounded text-[11px] font-medium border transition-colors ${
+              mode === 'NORMAL'
+                ? 'bg-blue-500/20 text-blue-300 border-blue-500/35'
+                : 'border-white/10 text-slate-400 hover:text-white'
+            }`}
+          >
+            Normal (Esc)
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMode('INSERT');
+              containerRef.current?.focus();
+            }}
+            className={`px-2 py-0.5 rounded text-[11px] font-medium border transition-colors ${
+              mode === 'INSERT'
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/35'
+                : 'border-white/10 text-slate-400 hover:text-white'
+            }`}
+          >
+            Insert (i)
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const fullText = lines.join('\n');
+              onSave(fullText);
+              setModified(false);
+              setStatusMessage(`"${baseName}" written`);
+              containerRef.current?.focus();
+            }}
+            className="px-2 py-0.5 rounded text-[11px] font-medium border border-emerald-500/30 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 transition-colors"
+          >
+            Save (:w)
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const fullText = lines.join('\n');
+              onSave(fullText);
+              onExit();
+            }}
+            className="px-2 py-0.5 rounded text-[11px] font-medium border border-indigo-500/30 bg-indigo-500/15 text-indigo-300 hover:bg-indigo-500/25 transition-colors"
+          >
+            :wq
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onExit();
+            }}
+            className="px-2 py-0.5 rounded text-[11px] font-medium border border-rose-500/30 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 transition-colors"
+          >
+            Quit (:q!)
+          </button>
+        </div>
+      </div>
+
       {/* Buffer Area */}
       <div className="flex-1 overflow-y-auto p-1 leading-5">
         {lines.map((lineText, lineIdx) => {

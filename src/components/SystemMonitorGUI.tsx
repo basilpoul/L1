@@ -25,6 +25,56 @@ interface SystemMonitorGUIProps {
   onRefreshVFS?: () => void;
 }
 
+const SparklineChart: React.FC<{
+  data: number[];
+  color: string;
+  height?: number;
+}> = ({ data, color, height = 46 }) => {
+  const width = 280;
+  const max = 100;
+  const min = 0;
+  const pts = data.length > 1 ? data : [data[0] || 10, data[0] || 10];
+  const stepX = width / (pts.length - 1);
+
+  const coordinates = pts.map((val, idx) => {
+    const x = idx * stepX;
+    const clamped = Math.max(min, Math.min(max, val));
+    const y = height - (clamped / max) * (height - 8) - 4;
+    return [x, y] as const;
+  });
+
+  const linePath = coordinates
+    .map(([x, y], i) => `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`)
+    .join(' ');
+
+  const areaPath = `${linePath} L ${width} ${height} L 0 ${height} Z`;
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className="w-full overflow-visible"
+      style={{ height: `${height}px` }}
+      preserveAspectRatio="none"
+    >
+      <defs>
+        <linearGradient id={`grad-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.28" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.0" />
+        </linearGradient>
+      </defs>
+      <path d={areaPath} fill={`url(#grad-${color.replace('#', '')})`} />
+      <path
+        d={linePath}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+};
+
 export const SystemMonitorGUI: React.FC<SystemMonitorGUIProps> = ({
   onClose,
   onRefreshVFS,
@@ -35,13 +85,49 @@ export const SystemMonitorGUI: React.FC<SystemMonitorGUIProps> = ({
   const [ufwState, setUfwState] = useState<UfwState>(() => getUfwState());
   const [jitter, setJitter] = useState(0);
 
-  // Periodic polling & slight jitter for realism
+  // Calculations
+  const runningServices = Object.values(sysState.services).filter((s) => s.status === 'running');
+  const runningContainers = dockerState.containers.filter((c) => c.status === 'running');
+
+  const baseCpu = 4;
+  const serviceCpu = runningServices.length * 6;
+  const dockerCpu = runningContainers.length * 11;
+  const cpuPercent = Math.min(100, Math.max(2, baseCpu + serviceCpu + dockerCpu + jitter));
+
+  const baseMem = 640;
+  const serviceMem = runningServices.length * 280;
+  const dockerMem = runningContainers.length * 450;
+  const usedMemMb = Math.min(8192, baseMem + serviceMem + dockerMem + jitter * 12);
+  const memPercent = Math.round((usedMemMb / 8192) * 100);
+
+  const [cpuHistory, setCpuHistory] = useState<number[]>(() =>
+    Array.from({ length: 18 }, (_, i) => Math.max(4, cpuPercent - 3 + (i % 4)))
+  );
+  const [memHistory, setMemHistory] = useState<number[]>(() =>
+    Array.from({ length: 18 }, () => memPercent)
+  );
+
   useEffect(() => {
     const timer = setInterval(() => {
-      setSysState(getSysAdminState());
-      setDockerState(getDockerState());
-      setUfwState(getUfwState());
-      setJitter(Math.floor(Math.random() * 5) - 2);
+      const nextSys = getSysAdminState();
+      const nextDocker = getDockerState();
+      const nextUfw = getUfwState();
+      const nextJitter = Math.floor(Math.random() * 5) - 2;
+
+      setSysState(nextSys);
+      setDockerState(nextDocker);
+      setUfwState(nextUfw);
+      setJitter(nextJitter);
+
+      const rSvcs = Object.values(nextSys.services).filter((s) => s.status === 'running').length;
+      const rCnts = nextDocker.containers.filter((c) => c.status === 'running').length;
+      const nextCpu = Math.min(100, Math.max(2, 4 + rSvcs * 6 + rCnts * 11 + nextJitter));
+      const nextMem = Math.round(
+        (Math.min(8192, 640 + rSvcs * 280 + rCnts * 450 + nextJitter * 12) / 8192) * 100
+      );
+
+      setCpuHistory((prev) => [...prev.slice(-19), nextCpu]);
+      setMemHistory((prev) => [...prev.slice(-19), nextMem]);
     }, 2000);
     return () => clearInterval(timer);
   }, []);
@@ -53,24 +139,6 @@ export const SystemMonitorGUI: React.FC<SystemMonitorGUIProps> = ({
     onRefreshVFS?.();
   };
 
-  // Calculations
-  const runningServices = Object.values(sysState.services).filter(s => s.status === 'running');
-  const runningContainers = dockerState.containers.filter(c => c.status === 'running');
-
-  // Dynamic CPU calculation
-  const baseCpu = 4;
-  const serviceCpu = runningServices.length * 6;
-  const dockerCpu = runningContainers.length * 11;
-  const cpuPercent = Math.min(100, Math.max(2, baseCpu + serviceCpu + dockerCpu + jitter));
-
-  // Dynamic Memory calculation (8192 MB total)
-  const baseMem = 640;
-  const serviceMem = runningServices.length * 280;
-  const dockerMem = runningContainers.length * 450;
-  const usedMemMb = Math.min(8192, baseMem + serviceMem + dockerMem + jitter * 12);
-  const memPercent = Math.round((usedMemMb / 8192) * 100);
-
-  // Toggle service
   const handleToggleService = (name: string) => {
     const state = getSysAdminState();
     const s = state.services[name];
@@ -81,10 +149,9 @@ export const SystemMonitorGUI: React.FC<SystemMonitorGUIProps> = ({
     onRefreshVFS?.();
   };
 
-  // Toggle container
   const handleToggleContainer = (id: string) => {
     const dState = getDockerState();
-    const c = dState.containers.find(cnt => cnt.id === id);
+    const c = dState.containers.find((cnt) => cnt.id === id);
     if (!c) return;
     c.status = c.status === 'running' ? 'exited' : 'running';
     saveDockerState(dState);
@@ -92,16 +159,14 @@ export const SystemMonitorGUI: React.FC<SystemMonitorGUIProps> = ({
     onRefreshVFS?.();
   };
 
-  // Remove container
   const handleRemoveContainer = (id: string) => {
     const dState = getDockerState();
-    dState.containers = dState.containers.filter(c => c.id !== id);
+    dState.containers = dState.containers.filter((c) => c.id !== id);
     saveDockerState(dState);
     setDockerState({ ...dState });
     onRefreshVFS?.();
   };
 
-  // Toggle UFW
   const handleToggleUfw = () => {
     const uState = getUfwState();
     uState.enabled = !uState.enabled;
@@ -111,27 +176,39 @@ export const SystemMonitorGUI: React.FC<SystemMonitorGUIProps> = ({
 
   return (
     <div
-      className="flex flex-col h-full font-sans text-xs select-none border-l border-white/5"
-      style={{ background: '#121420', color: '#cbd5e1' }}
+      className="flex flex-col h-full font-sans text-xs select-none border-l"
+      style={{
+        background: 'var(--theme-surface)',
+        borderColor: 'var(--theme-border)',
+        color: 'var(--theme-text)',
+      }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3 h-10 border-b border-white/5 bg-[#171927]">
+      <div
+        className="flex items-center justify-between px-3.5 h-10 border-b shrink-0"
+        style={{
+          background: 'var(--theme-tab-bg)',
+          borderColor: 'var(--theme-border)',
+        }}
+      >
         <div className="flex items-center gap-2">
-          <Activity size={15} className="text-emerald-400" />
-          <span className="font-semibold text-slate-200">System Monitor</span>
+          <Activity size={14} className="text-emerald-400" />
+          <span className="font-semibold tracking-tight">System Telemetry</span>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={refreshAll}
-            className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
-            title="Refresh metrics"
+            className="p-1.5 rounded-md hover:bg-white/[0.06] transition-colors"
+            style={{ color: 'var(--theme-text-secondary)' }}
+            title="Refresh telemetry"
           >
-            <RefreshCw size={13} />
+            <RefreshCw size={12} />
           </button>
           {onClose && (
             <button
               onClick={onClose}
-              className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+              className="p-1.5 rounded-md hover:bg-white/[0.06] transition-colors"
+              style={{ color: 'var(--theme-text-secondary)' }}
               title="Close Monitor"
             >
               <X size={13} />
@@ -140,166 +217,230 @@ export const SystemMonitorGUI: React.FC<SystemMonitorGUIProps> = ({
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center px-2 pt-2 border-b border-white/5 bg-[#141624] gap-1">
-        {[
-          { key: 'overview', label: 'Overview', icon: Cpu },
-          { key: 'services', label: `Services (${runningServices.length})`, icon: Server },
-          { key: 'docker', label: `Docker (${runningContainers.length})`, icon: Box },
-          { key: 'network', label: 'Network', icon: Radio },
-        ].map(t => {
-          const Icon = t.icon;
-          const isActive = activeTab === t.key;
-          return (
-            <button
-              key={t.key}
-              onClick={() => setActiveTab(t.key as any)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-t text-xs font-medium transition-colors ${
-                isActive
-                  ? 'bg-[#181a2b] text-emerald-400 border-b-2 border-emerald-400'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Icon size={12} />
-              <span>{t.label}</span>
-            </button>
-          );
-        })}
+      {/* Segmented Sub-Navigation Tabs */}
+      <div
+        className="p-2 border-b shrink-0"
+        style={{
+          background: 'var(--theme-bg)',
+          borderColor: 'var(--theme-border)',
+        }}
+      >
+        <div
+          className="grid grid-cols-4 gap-1 p-0.5 rounded-lg border"
+          style={{
+            background: 'var(--theme-surface)',
+            borderColor: 'var(--theme-border)',
+          }}
+        >
+          {[
+            { key: 'overview', label: 'Metrics', icon: Cpu },
+            { key: 'services', label: `Daemons · ${runningServices.length}`, icon: Server },
+            { key: 'docker', label: `Docker · ${runningContainers.length}`, icon: Box },
+            { key: 'network', label: 'Ports', icon: Radio },
+          ].map((t) => {
+            const isActive = activeTab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setActiveTab(t.key as typeof activeTab)}
+                className={`flex items-center justify-center gap-1 py-1.5 px-1.5 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap shrink-0 ${
+                  isActive ? 'bg-white/[0.09] text-white shadow-xs' : 'hover:text-white'
+                }`}
+                style={!isActive ? { color: 'var(--theme-text-secondary)' } : undefined}
+              >
+                <span>{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-4">
-        {/* OVERVIEW TAB */}
+      <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5">
         {activeTab === 'overview' && (
-          <div className="space-y-4">
-            {/* Host Details */}
-            <div className="p-3 rounded-lg bg-[#181b2e] border border-white/5">
-              <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-2">Host Overview</div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="space-y-3.5">
+            {/* Real-Time CPU Sparkline Card */}
+            <div
+              className="p-3.5 rounded-xl border space-y-2.5"
+              style={{
+                background: 'var(--theme-card-bg)',
+                borderColor: 'var(--theme-border)',
+              }}
+            >
+              <div className="flex items-baseline justify-between">
                 <div>
-                  <span className="text-slate-500">Hostname:</span>{' '}
-                  <span className="text-slate-200 font-mono">linux-box</span>
+                  <div className="text-xs font-semibold">CPU Load</div>
+                  <div
+                    className="text-[11px] font-mono mt-0.5"
+                    style={{ color: 'var(--theme-text-secondary)' }}
+                  >
+                    4 vCPU · 2.80 GHz · x86_64
+                  </div>
                 </div>
-                <div>
-                  <span className="text-slate-500">OS:</span>{' '}
-                  <span className="text-slate-200">Ubuntu 22.04 LTS</span>
+                <div className="text-right">
+                  <span
+                    className="text-lg font-bold font-mono tabular-nums"
+                    style={{
+                      color:
+                        cpuPercent > 80 ? '#f87171' : cpuPercent > 50 ? '#fbbf24' : '#34d399',
+                    }}
+                  >
+                    {cpuPercent}%
+                  </span>
                 </div>
-                <div>
-                  <span className="text-slate-500">Kernel:</span>{' '}
-                  <span className="text-slate-200 font-mono">6.5.0-generic</span>
-                </div>
-                <div>
-                  <span className="text-slate-500">Uptime:</span>{' '}
-                  <span className="text-slate-200">4 days, 6 hours</span>
-                </div>
+              </div>
+
+              <SparklineChart
+                data={cpuHistory}
+                color={cpuPercent > 80 ? '#f87171' : cpuPercent > 50 ? '#fbbf24' : '#34d399'}
+              />
+
+              <div
+                className="flex items-center justify-between text-[11px] font-mono pt-1 border-t"
+                style={{
+                  borderColor: 'var(--theme-border)',
+                  color: 'var(--theme-text-secondary)',
+                }}
+              >
+                <span>{runningServices.length} active daemons</span>
+                <span>·</span>
+                <span>{runningContainers.length} containers</span>
               </div>
             </div>
 
-            {/* CPU Gauge */}
-            <div className="p-3 rounded-lg bg-[#181b2e] border border-white/5 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-slate-300 font-medium">
-                  <Cpu size={14} className="text-blue-400" />
-                  CPU Usage
-                </span>
-                <span className="font-mono text-emerald-400 font-semibold">{cpuPercent}%</span>
-              </div>
-              <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{
-                    width: `${cpuPercent}%`,
-                    background: cpuPercent > 80 ? '#f87171' : cpuPercent > 50 ? '#fbbf24' : '#34d399',
-                  }}
-                />
-              </div>
-              <div className="text-[11px] text-slate-500">
-                4 cores @ 2.80GHz &bull; {runningServices.length} services &bull; {runningContainers.length} containers
-              </div>
-            </div>
-
-            {/* Memory Gauge */}
-            <div className="p-3 rounded-lg bg-[#181b2e] border border-white/5 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-slate-300 font-medium">
-                  <Activity size={14} className="text-purple-400" />
-                  Memory Usage
-                </span>
-                <span className="font-mono text-purple-400 font-semibold">
-                  {memPercent}% ({usedMemMb} MB / 8192 MB)
-                </span>
-              </div>
-              <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-purple-500 transition-all duration-500"
-                  style={{ width: `${memPercent}%` }}
-                />
-              </div>
-              <div className="text-[11px] text-slate-500">
-                Swap: 0 MB / 2048 MB &bull; Buffer/Cache: 1420 MB
-              </div>
-            </div>
-
-            {/* Quick Status Cards */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-lg bg-[#181b2e] border border-white/5">
-                <div className="text-slate-400 text-[11px] mb-1">Daemons Running</div>
-                <div className="text-lg font-bold text-emerald-400 font-mono">
-                  {runningServices.length} / {Object.keys(sysState.services).length}
+            {/* Real-Time Memory Sparkline Card */}
+            <div
+              className="p-3.5 rounded-xl border space-y-2.5"
+              style={{
+                background: 'var(--theme-card-bg)',
+                borderColor: 'var(--theme-border)',
+              }}
+            >
+              <div className="flex items-baseline justify-between">
+                <div>
+                  <div className="text-xs font-semibold">Memory Allocation</div>
+                  <div
+                    className="text-[11px] font-mono tabular-nums mt-0.5"
+                    style={{ color: 'var(--theme-text-secondary)' }}
+                  >
+                    {usedMemMb} MB / 8192 MB physical
+                  </div>
                 </div>
+                <span className="text-lg font-bold font-mono tabular-nums text-purple-400">
+                  {memPercent}%
+                </span>
               </div>
 
-              <div className="p-3 rounded-lg bg-[#181b2e] border border-white/5">
-                <div className="text-slate-400 text-[11px] mb-1">Firewall (UFW)</div>
-                <div className={`text-lg font-bold font-mono ${ufwState.enabled ? 'text-emerald-400' : 'text-slate-500'}`}>
-                  {ufwState.enabled ? 'ACTIVE' : 'INACTIVE'}
+              <SparklineChart data={memHistory} color="#a855f7" />
+
+              <div
+                className="flex items-center justify-between text-[11px] font-mono pt-1 border-t tabular-nums"
+                style={{
+                  borderColor: 'var(--theme-border)',
+                  color: 'var(--theme-text-secondary)',
+                }}
+              >
+                <span>Swap: 0 / 2048 MB</span>
+                <span>·</span>
+                <span>Cache: 1420 MB</span>
+              </div>
+            </div>
+
+            {/* Host Kernel & Security Summary */}
+            <div
+              className="p-3.5 rounded-xl border space-y-2"
+              style={{
+                background: 'var(--theme-card-bg)',
+                borderColor: 'var(--theme-border)',
+              }}
+            >
+              <div className="text-xs font-semibold">Kernel &amp; Host Environment</div>
+              <div className="grid grid-cols-2 gap-y-2 gap-x-3 text-[11px] pt-1">
+                <div>
+                  <div style={{ color: 'var(--theme-muted)' }}>Hostname</div>
+                  <div className="font-mono font-medium mt-0.5">linux-box</div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--theme-muted)' }}>Distribution</div>
+                  <div className="font-medium mt-0.5">Ubuntu 22.04 LTS</div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--theme-muted)' }}>Kernel Release</div>
+                  <div className="font-mono font-medium mt-0.5">6.5.0-generic</div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--theme-muted)' }}>UFW Firewall</div>
+                  <div
+                    className={`font-mono font-semibold mt-0.5 ${
+                      ufwState.enabled ? 'text-emerald-400' : 'text-amber-400'
+                    }`}
+                  >
+                    {ufwState.enabled ? 'Enabled (Enforcing)' : 'Disabled'}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* SERVICES TAB */}
+        {/* DAEMONS / SERVICES TAB */}
         {activeTab === 'services' && (
           <div className="space-y-2">
-            <div className="text-[11px] text-slate-400 font-medium mb-1">systemctl System Daemons</div>
             {Object.values(sysState.services).map((s: ServiceState) => {
               const isRunning = s.status === 'running';
               return (
                 <div
                   key={s.name}
-                  className="flex items-center justify-between p-2.5 rounded-lg bg-[#181b2e] border border-white/5 hover:border-white/10 transition-colors"
+                  className="flex items-center justify-between p-3 rounded-xl border transition-colors"
+                  style={{
+                    background: 'var(--theme-card-bg)',
+                    borderColor: 'var(--theme-border)',
+                  }}
                 >
-                  <div className="space-y-0.5 min-w-0 flex-1 pr-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-200 font-mono">{s.name}</span>
-                      {s.port && (
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-400 font-mono">
-                          :{s.port}
-                        </span>
-                      )}
+                  <div className="space-y-1 min-w-0 flex-1 pr-3">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="font-semibold font-mono">{s.name}.service</span>
+                      <span className="opacity-30">·</span>
                       <span
-                        className={`text-[10px] px-1.5 py-0.2 rounded-full font-medium ${
-                          isRunning
-                            ? 'bg-emerald-500/20 text-emerald-400'
-                            : 'bg-slate-700 text-slate-400'
+                        className={`font-mono text-[11px] ${
+                          isRunning ? 'text-emerald-400' : 'text-slate-500'
                         }`}
                       >
-                        {isRunning ? 'active (running)' : 'inactive (dead)'}
+                        {isRunning ? 'running' : 'stopped'}
                       </span>
+                      {s.port && (
+                        <>
+                          <span className="opacity-30">·</span>
+                          <span
+                            className="font-mono text-[11px] tabular-nums"
+                            style={{ color: 'var(--theme-dir)' }}
+                          >
+                            :{s.port}
+                          </span>
+                        </>
+                      )}
                     </div>
-                    <div className="text-[11px] text-slate-400 truncate">{s.description}</div>
+                    <div
+                      className="text-[11px] truncate"
+                      style={{ color: 'var(--theme-text-secondary)' }}
+                    >
+                      {s.description}
+                    </div>
                   </div>
 
                   <button
                     onClick={() => handleToggleService(s.name)}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors shrink-0 ${
                       isRunning
-                        ? 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30'
-                        : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
+                        ? 'bg-rose-500/10 text-rose-300 border-rose-500/25 hover:bg-rose-500/20'
+                        : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25 hover:bg-emerald-500/20'
                     }`}
                   >
-                    {isRunning ? <Square size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" />}
+                    {isRunning ? (
+                      <Square size={10} fill="currentColor" />
+                    ) : (
+                      <Play size={10} fill="currentColor" />
+                    )}
                     <span>{isRunning ? 'Stop' : 'Start'}</span>
                   </button>
                 </div>
@@ -310,74 +451,93 @@ export const SystemMonitorGUI: React.FC<SystemMonitorGUIProps> = ({
 
         {/* DOCKER TAB */}
         {activeTab === 'docker' && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] text-slate-400 font-medium">Containers ({dockerState.containers.length})</span>
-              <span className="text-[11px] text-slate-500">{dockerState.images.length} images available</span>
+          <div className="space-y-2.5">
+            <div
+              className="flex items-center justify-between text-[11px] px-1"
+              style={{ color: 'var(--theme-text-secondary)' }}
+            >
+              <span>{dockerState.containers.length} total containers</span>
+              <span className="font-mono tabular-nums">{dockerState.images.length} cached images</span>
             </div>
 
             {dockerState.containers.length === 0 ? (
-              <div className="p-6 text-center text-slate-500 rounded-lg bg-[#181b2e] border border-white/5">
-                <Box size={24} className="mx-auto mb-2 opacity-50" />
-                <p>No containers created yet.</p>
-                <p className="text-[11px] text-slate-600 mt-1">Try: <code>docker run -d -p 8080:80 nginx:latest</code></p>
+              <div
+                className="p-6 text-center rounded-xl border"
+                style={{
+                  background: 'var(--theme-card-bg)',
+                  borderColor: 'var(--theme-border)',
+                  color: 'var(--theme-text-secondary)',
+                }}
+              >
+                <Box size={22} className="mx-auto mb-2 opacity-50" />
+                <p className="font-medium">No Docker containers provisioned</p>
+                <p className="text-[11px] font-mono mt-1 opacity-75">
+                  docker run -d -p 8080:80 nginx:latest
+                </p>
               </div>
             ) : (
               dockerState.containers.map((c: DockerContainer) => {
                 const isRunning = c.status === 'running';
-                const portsStr = c.ports.map(p => `${p.hostPort}:${p.containerPort}`).join(', ');
+                const portsStr = c.ports
+                  .map((p) => `${p.hostPort}→${p.containerPort}`)
+                  .join(', ');
 
                 return (
                   <div
                     key={c.id}
-                    className="p-3 rounded-lg bg-[#181b2e] border border-white/5 space-y-2 hover:border-white/10 transition-colors"
+                    className="p-3 rounded-xl border space-y-2 transition-colors"
+                    style={{
+                      background: 'var(--theme-card-bg)',
+                      borderColor: 'var(--theme-border)',
+                    }}
                   >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-slate-100 font-mono">{c.name}</span>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="font-semibold font-mono truncate">{c.name}</span>
+                          <span className="opacity-30">·</span>
                           <span
-                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-medium ${
-                              isRunning
-                                ? 'bg-emerald-500/20 text-emerald-400'
-                                : 'bg-slate-700 text-slate-400'
+                            className={`font-mono text-[11px] ${
+                              isRunning ? 'text-emerald-400' : 'text-slate-500'
                             }`}
                           >
                             {isRunning ? 'running' : 'exited'}
                           </span>
                         </div>
-                        <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                          {c.image} &bull; ID: {c.id.slice(0, 10)}
+                        <div
+                          className="text-[11px] font-mono mt-0.5"
+                          style={{ color: 'var(--theme-text-secondary)' }}
+                        >
+                          {c.image} · {c.id.slice(0, 10)}
+                          {portsStr ? ` · ${portsStr}` : ''}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 shrink-0">
                         <button
                           onClick={() => handleToggleContainer(c.id)}
-                          className={`p-1.5 rounded transition-colors ${
+                          className={`p-1.5 rounded-md border transition-colors ${
                             isRunning
-                              ? 'text-rose-400 hover:bg-rose-500/20'
-                              : 'text-emerald-400 hover:bg-emerald-500/20'
+                              ? 'text-rose-300 border-rose-500/25 hover:bg-rose-500/15'
+                              : 'text-emerald-300 border-emerald-500/25 hover:bg-emerald-500/15'
                           }`}
                           title={isRunning ? 'Stop container' : 'Start container'}
                         >
-                          {isRunning ? <Square size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+                          {isRunning ? (
+                            <Square size={11} fill="currentColor" />
+                          ) : (
+                            <Play size={11} fill="currentColor" />
+                          )}
                         </button>
                         <button
                           onClick={() => handleRemoveContainer(c.id)}
-                          className="p-1.5 rounded text-slate-400 hover:text-rose-400 hover:bg-white/5 transition-colors"
+                          className="p-1.5 rounded-md border border-transparent hover:border-rose-500/25 hover:bg-rose-500/10 text-slate-400 hover:text-rose-300 transition-colors"
                           title="Remove container"
                         >
                           <Trash2 size={12} />
                         </button>
                       </div>
                     </div>
-
-                    {portsStr && (
-                      <div className="text-[11px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded font-mono w-fit">
-                        Port Mapping: 0.0.0.0:{portsStr}
-                      </div>
-                    )}
                   </div>
                 );
               })
@@ -387,71 +547,110 @@ export const SystemMonitorGUI: React.FC<SystemMonitorGUIProps> = ({
 
         {/* NETWORK & FIREWALL TAB */}
         {activeTab === 'network' && (
-          <div className="space-y-4">
-            {/* UFW Status */}
-            <div className="p-3 rounded-lg bg-[#181b2e] border border-white/5 space-y-2">
+          <div className="space-y-3.5">
+            <div
+              className="p-3.5 rounded-xl border space-y-2"
+              style={{
+                background: 'var(--theme-card-bg)',
+                borderColor: 'var(--theme-border)',
+              }}
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {ufwState.enabled ? (
-                    <Shield size={16} className="text-emerald-400" />
+                    <Shield size={15} className="text-emerald-400" />
                   ) : (
-                    <ShieldAlert size={16} className="text-amber-400" />
+                    <ShieldAlert size={15} className="text-amber-400" />
                   )}
-                  <span className="font-semibold text-slate-200">Uncomplicated Firewall (UFW)</span>
+                  <span className="font-semibold text-xs">UFW Packet Filter</span>
                 </div>
                 <button
                   onClick={handleToggleUfw}
-                  className={`px-2.5 py-1 rounded font-medium text-xs transition-colors ${
+                  className={`px-2.5 py-1 rounded-md font-medium text-xs border transition-colors ${
                     ufwState.enabled
-                      ? 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30'
-                      : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
+                      ? 'bg-rose-500/10 text-rose-300 border-rose-500/25 hover:bg-rose-500/20'
+                      : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25 hover:bg-emerald-500/20'
                   }`}
                 >
-                  {ufwState.enabled ? 'Disable Firewall' : 'Enable Firewall'}
+                  {ufwState.enabled ? 'Disable' : 'Enable'}
                 </button>
               </div>
-              <div className="text-[11px] text-slate-400">
-                Default: incoming <span className="font-mono text-amber-400">deny</span>, outgoing <span className="font-mono text-emerald-400">allow</span>
+              <div
+                className="text-[11px] font-mono"
+                style={{ color: 'var(--theme-text-secondary)' }}
+              >
+                Policy: incoming <span className="text-amber-400">deny</span> · outgoing{' '}
+                <span className="text-emerald-400">allow</span>
               </div>
             </div>
 
-            {/* Listening Ports Table */}
-            <div className="p-3 rounded-lg bg-[#181b2e] border border-white/5 space-y-2">
-              <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Active Listening Ports</div>
-              <div className="space-y-1 font-mono text-[11px]">
-                <div className="flex items-center justify-between py-1 border-b border-white/5 text-slate-500">
-                  <span>PORT / PROTO</span>
-                  <span>SERVICE / PROCESS</span>
+            {/* Active Socket Bindings */}
+            <div
+              className="p-3.5 rounded-xl border space-y-2"
+              style={{
+                background: 'var(--theme-card-bg)',
+                borderColor: 'var(--theme-border)',
+              }}
+            >
+              <div className="text-xs font-semibold">Listening TCP/UDP Sockets</div>
+              <div className="divide-y divide-white/[0.04] font-mono text-[11px] tabular-nums">
+                <div
+                  className="flex items-center justify-between py-1.5"
+                  style={{ color: 'var(--theme-muted)' }}
+                >
+                  <span>LOCAL ADDRESS</span>
+                  <span>PID / DAEMON</span>
                 </div>
-                {runningServices.map(s => (
-                  <div key={s.name} className="flex items-center justify-between py-0.5 text-slate-300">
-                    <span className="text-blue-400">0.0.0.0:{s.port}</span>
-                    <span>{s.pid}/{s.name}</span>
+                {runningServices.map((s) => (
+                  <div key={s.name} className="flex items-center justify-between py-1.5">
+                    <span style={{ color: 'var(--theme-dir)' }}>0.0.0.0:{s.port}</span>
+                    <span>
+                      {s.pid}/{s.name}
+                    </span>
                   </div>
                 ))}
-                {runningContainers.map(c =>
-                  c.ports.map(p => (
-                    <div key={`${c.id}-${p.hostPort}`} className="flex items-center justify-between py-0.5 text-slate-300">
-                      <span className="text-blue-400">0.0.0.0:{p.hostPort}</span>
+                {runningContainers.map((c) =>
+                  c.ports.map((p) => (
+                    <div
+                      key={`${c.id}-${p.hostPort}`}
+                      className="flex items-center justify-between py-1.5"
+                    >
+                      <span style={{ color: 'var(--theme-dir)' }}>0.0.0.0:{p.hostPort}</span>
                       <span className="text-purple-400">docker-proxy ({c.name})</span>
                     </div>
                   ))
                 )}
                 {runningServices.length === 0 && runningContainers.length === 0 && (
-                  <div className="text-slate-500 py-2 text-center">No listening ports.</div>
+                  <div
+                    className="py-4 text-center font-sans"
+                    style={{ color: 'var(--theme-muted)' }}
+                  >
+                    No active listening sockets
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* Firewall Rules */}
             {ufwState.enabled && (
-              <div className="p-3 rounded-lg bg-[#181b2e] border border-white/5 space-y-2">
-                <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Firewall Rules</div>
-                <div className="space-y-1 font-mono text-[11px]">
+              <div
+                className="p-3.5 rounded-xl border space-y-2"
+                style={{
+                  background: 'var(--theme-card-bg)',
+                  borderColor: 'var(--theme-border)',
+                }}
+              >
+                <div className="text-xs font-semibold">UFW Filter Rules</div>
+                <div className="divide-y divide-white/[0.04] font-mono text-[11px] tabular-nums">
                   {ufwState.rules.map((r, i) => (
-                    <div key={r.id} className="flex items-center justify-between py-0.5 text-slate-300">
-                      <span>[{i + 1}] {r.port}/{r.proto}</span>
-                      <span className={r.action === 'ALLOW' ? 'text-emerald-400' : 'text-rose-400'}>
+                    <div key={r.id} className="flex items-center justify-between py-1.5">
+                      <span>
+                        [{i + 1}] {r.port}/{r.proto}
+                      </span>
+                      <span
+                        className={
+                          r.action === 'ALLOW' ? 'text-emerald-400' : 'text-rose-400'
+                        }
+                      >
                         {r.action}
                       </span>
                     </div>

@@ -1,0 +1,5 @@
+{
+  "name": "LinuxSim — Cloud-Native Linux & DevOps IDE Simulator",
+  "description": "An interactive, Warp-inspired Linux desktop, terminal multiplexer, Kubernetes & Docker topology simulator, and hands-on DevOps lab environment.",
+  "requestFramePermissions": []
+}

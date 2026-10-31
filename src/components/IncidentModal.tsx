@@ -37,7 +37,9 @@ export const IncidentModal: React.FC<IncidentModalProps> = ({
     }
   });
 
-  const [feedback, setFeedback] = useState<Record<string, { resolved: boolean; message: string }>>({});
+  const [feedback, setFeedback] = useState<Record<string, { resolved: boolean; message: string }>>(
+    {}
+  );
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -52,18 +54,21 @@ export const IncidentModal: React.FC<IncidentModalProps> = ({
     const updated = Array.from(new Set([...activeFaults, scenario.id]));
     setActiveFaults(updated);
     localStorage.setItem(ACTIVE_FAULTS_KEY, JSON.stringify(updated));
-    setFeedback(prev => ({
+    setFeedback((prev) => ({
       ...prev,
-      [scenario.id]: { resolved: false, message: `Fault injected! Check symptom: "${scenario.symptom}"` },
+      [scenario.id]: {
+        resolved: false,
+        message: `Fault injected. Observed symptom: "${scenario.symptom}"`,
+      },
     }));
     onRefresh();
   };
 
   const handleVerify = (scenario: IncidentScenario) => {
     const result = scenario.verifyResolution(vfs, history);
-    setFeedback(prev => ({ ...prev, [scenario.id]: result }));
+    setFeedback((prev) => ({ ...prev, [scenario.id]: result }));
     if (result.resolved) {
-      const updated = activeFaults.filter(id => id !== scenario.id);
+      const updated = activeFaults.filter((id) => id !== scenario.id);
       setActiveFaults(updated);
       localStorage.setItem(ACTIVE_FAULTS_KEY, JSON.stringify(updated));
     }
@@ -73,26 +78,43 @@ export const IncidentModal: React.FC<IncidentModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-fade-in">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/75 backdrop-blur-xs animate-fadeIn select-none"
+    >
       <div
-        className="flex flex-col w-full max-w-4xl h-[88vh] bg-[#121422] border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
-        onClick={e => e.stopPropagation()}
+        className="flex flex-col w-full max-w-4xl h-[90dvh] sm:h-[86vh] rounded-t-2xl sm:rounded-xl border shadow-2xl overflow-hidden"
+        style={{
+          background: 'var(--theme-surface)',
+          borderColor: 'var(--theme-border-strong)',
+          color: 'var(--theme-text)',
+        }}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#17192a]">
+        <div
+          className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b shrink-0"
+          style={{
+            background: 'var(--theme-tab-bg)',
+            borderColor: 'var(--theme-border)',
+          }}
+        >
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
-              <Flame size={20} className="animate-pulse" />
-            </div>
+            <Flame size={18} className="text-rose-400" />
             <div>
-              <h2 className="text-base font-bold text-white tracking-wide">Break-Fix Incident Simulator</h2>
-              <p className="text-xs text-slate-400">Troubleshoot & resolve real-world Linux, Docker & SysAdmin outages</p>
+              <h2 className="text-sm font-bold tracking-tight">
+                Break-Fix Incident Response Console
+              </h2>
+              <p className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
+                Inject realistic production outages and validate root-cause remediation
+              </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-white/[0.06] transition-colors"
+            style={{ color: 'var(--theme-text-secondary)' }}
           >
             <X size={18} />
           </button>
@@ -100,57 +122,81 @@ export const IncidentModal: React.FC<IncidentModalProps> = ({
 
         {/* Incidents List */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {INCIDENTS.map(inc => {
+          {INCIDENTS.map((inc, idx) => {
             const isFaultActive = activeFaults.includes(inc.id);
             const status = feedback[inc.id];
 
             return (
               <div
                 key={inc.id}
-                className={`p-4 rounded-xl border transition-all ${
-                  isFaultActive
-                    ? 'bg-rose-950/20 border-rose-500/30'
-                    : 'bg-[#181a2c] border-white/5 hover:border-white/10'
-                }`}
+                className="p-4 rounded-xl border transition-all"
+                style={{
+                  background: isFaultActive
+                    ? 'rgba(244, 63, 94, 0.06)'
+                    : 'var(--theme-card-bg)',
+                  borderColor: isFaultActive
+                    ? 'rgba(244, 63, 94, 0.35)'
+                    : 'var(--theme-border)',
+                }}
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                {/* Clean Unboxed Kicker Metadata */}
+                <div className="flex items-center justify-between text-xs font-mono mb-1.5">
                   <div className="flex items-center gap-2">
+                    <span className="tabular-nums opacity-50">
+                      INC-{String(idx + 1).padStart(2, '0')}
+                    </span>
+                    <span className="opacity-30">·</span>
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                        inc.severity === 'Critical'
-                          ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                          : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      className={`font-semibold ${
+                        inc.severity === 'Critical' ? 'text-rose-400' : 'text-amber-400'
                       }`}
                     >
                       {inc.severity}
                     </span>
-                    <span className="text-xs text-slate-500 font-mono">[{inc.category}]</span>
-                    <h3 className="text-sm font-semibold text-slate-100">{inc.title}</h3>
+                    <span className="opacity-30">·</span>
+                    <span style={{ color: 'var(--theme-text-secondary)' }}>{inc.category}</span>
                   </div>
 
                   {isFaultActive && (
-                    <span className="flex items-center gap-1 text-[11px] font-medium text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20 w-fit">
+                    <span className="inline-flex items-center gap-1 text-rose-400 text-[11px] font-medium">
                       <ShieldAlert size={12} />
-                      Fault Active
+                      <span>Active Outage</span>
                     </span>
                   )}
                 </div>
 
-                <p className="text-xs text-slate-300 mb-2">{inc.description}</p>
+                <h3 className="text-sm font-semibold mb-1.5">{inc.title}</h3>
+                <p
+                  className="text-xs mb-3 leading-relaxed"
+                  style={{ color: 'var(--theme-text-secondary)' }}
+                >
+                  {inc.description}
+                </p>
 
-                {/* Symptom Box */}
-                <div className="p-2.5 rounded-lg bg-black/30 border border-white/5 font-mono text-xs text-slate-400 mb-3">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500 font-sans font-semibold mb-1">Observed Symptom:</div>
+                {/* Symptom Telemetry Box */}
+                <div
+                  className="p-3 rounded-lg border font-mono text-xs mb-3"
+                  style={{
+                    background: 'var(--theme-bg)',
+                    borderColor: 'var(--theme-border)',
+                  }}
+                >
+                  <div
+                    className="text-[10px] uppercase tracking-wider font-sans font-semibold mb-1"
+                    style={{ color: 'var(--theme-muted)' }}
+                  >
+                    Observed Telemetry Symptom
+                  </div>
                   <div className="text-amber-400">{inc.symptom}</div>
                 </div>
 
-                {/* Feedback Alert */}
+                {/* Verification Status Banner */}
                 {status && (
                   <div
-                    className={`flex items-start gap-2 p-2.5 rounded-lg text-xs mb-3 ${
+                    className={`flex items-start gap-2.5 p-3 rounded-lg text-xs mb-3 border ${
                       status.resolved
-                        ? 'bg-emerald-950/30 border border-emerald-500/30 text-emerald-300'
-                        : 'bg-rose-950/30 border border-rose-500/30 text-rose-300'
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                        : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
                     }`}
                   >
                     {status.resolved ? (
@@ -159,17 +205,32 @@ export const IncidentModal: React.FC<IncidentModalProps> = ({
                       <XCircle size={15} className="text-rose-400 shrink-0 mt-0.5" />
                     )}
                     <div>
-                      <div className="font-semibold">{status.resolved ? 'Incident Resolved!' : 'Resolution Incomplete'}</div>
-                      <div className="text-slate-300 mt-0.5">{status.message}</div>
+                      <div className="font-semibold">
+                        {status.resolved ? 'Incident Resolved' : 'Remediation Incomplete'}
+                      </div>
+                      <div className="opacity-90 mt-0.5">{status.message}</div>
                     </div>
                   </div>
                 )}
 
                 {/* Action Controls */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/5">
-                  <details className="text-[11px] text-slate-400 cursor-pointer">
-                    <summary className="hover:text-slate-200">View Troubleshooting Hint</summary>
-                    <pre className="mt-1.5 p-2 bg-black/40 rounded border border-white/5 text-slate-300 font-mono whitespace-pre-wrap">
+                <div
+                  className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t"
+                  style={{ borderColor: 'var(--theme-border)' }}
+                >
+                  <details
+                    className="text-xs cursor-pointer"
+                    style={{ color: 'var(--theme-text-secondary)' }}
+                  >
+                    <summary className="hover:underline">View Runbook Hint</summary>
+                    <pre
+                      className="mt-2 p-2.5 rounded-lg border font-mono text-[11px] whitespace-pre-wrap"
+                      style={{
+                        background: 'var(--theme-bg)',
+                        borderColor: 'var(--theme-border)',
+                        color: 'var(--theme-text)',
+                      }}
+                    >
                       {inc.resolutionHint}
                     </pre>
                   </details>
@@ -177,18 +238,18 @@ export const IncidentModal: React.FC<IncidentModalProps> = ({
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleDeployFault(inc)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-rose-600/20 text-rose-300 border border-rose-500/30 hover:bg-rose-600/30 transition-all hover:scale-105"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-rose-500/15 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25 transition-colors"
                     >
-                      <Play size={12} fill="currentColor" />
-                      <span>Deploy Fault</span>
+                      <Play size={11} fill="currentColor" />
+                      <span>Inject Fault</span>
                     </button>
 
                     <button
                       onClick={() => handleVerify(inc)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30 transition-all hover:scale-105"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 transition-colors"
                     >
                       <CheckCircle2 size={12} />
-                      <span>Verify Resolution</span>
+                      <span>Verify Fix</span>
                     </button>
                   </div>
                 </div>

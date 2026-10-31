@@ -51,7 +51,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onSelectMission,
   onSelectTheme,
   missions,
-  currentTheme: _currentTheme = 'slate',
+  currentTheme = 'slate',
 }) => {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -59,105 +59,100 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 50);
+      setTimeout(() => inputRef.current?.focus(), 40);
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  // Define Quick Actions
   const actions = [
     {
       id: 'split-h',
       title: 'Split Terminal Horizontally',
       category: 'Terminal',
-      icon: <Rows size={15} className="text-blue-400" />,
+      icon: <Rows size={14} className="text-blue-400" />,
       run: onSplitHorizontal,
     },
     {
       id: 'split-v',
       title: 'Split Terminal Vertically',
       category: 'Terminal',
-      icon: <Columns size={15} className="text-blue-400" />,
+      icon: <Columns size={14} className="text-blue-400" />,
       run: onSplitVertical,
     },
     {
-      id: 'topology',
-      title: 'Open Network & Cluster Topology Map',
-      category: 'Navigation',
-      icon: <Network size={15} className="text-cyan-400" />,
-      run: onToggleTopology,
+      id: 'explorer',
+      title: 'Toggle Virtual File Explorer',
+      category: 'Workspace',
+      icon: <FolderTree size={14} className="text-blue-400" />,
+      run: onToggleFileExplorer,
     },
     {
       id: 'monitor',
-      title: 'Open System Monitor GUI',
-      category: 'Navigation',
-      icon: <Activity size={15} className="text-emerald-400" />,
+      title: 'Toggle System Telemetry Monitor',
+      category: 'Workspace',
+      icon: <Activity size={14} className="text-emerald-400" />,
       run: onToggleSystemMonitor,
     },
     {
-      id: 'explorer',
-      title: 'Toggle File Explorer Panel',
-      category: 'Navigation',
-      icon: <FolderTree size={15} className="text-amber-400" />,
-      run: onToggleFileExplorer,
+      id: 'topology',
+      title: 'Toggle Infrastructure Topology Map',
+      category: 'Workspace',
+      icon: <Network size={14} className="text-cyan-400" />,
+      run: onToggleTopology,
     },
     {
       id: 'incidents',
       title: 'Open Break-Fix Incident Response Console',
-      category: 'Missions & Labs',
-      icon: <Flame size={15} className="text-rose-400" />,
+      category: 'Operations',
+      icon: <Flame size={14} className="text-rose-400" />,
       run: onOpenIncidents,
     },
     {
       id: 'sound',
-      title: isSoundMuted ? 'Enable Audio SFX (Web Audio API)' : 'Mute Audio SFX',
-      category: 'Audio',
+      title: isSoundMuted ? 'Enable Terminal Audio SFX' : 'Mute Terminal Audio SFX',
+      category: 'Preferences',
       icon: isSoundMuted ? (
-        <VolumeX size={15} className="text-rose-400" />
+        <VolumeX size={14} className="text-rose-400" />
       ) : (
-        <Volume2 size={15} className="text-emerald-400" />
+        <Volume2 size={14} className="text-emerald-400" />
       ),
       run: onToggleSound,
     },
     {
       id: 'reset',
-      title: 'Reset File System to Factory State',
+      title: 'Reset File System & Curriculum to Factory Defaults',
       category: 'System',
-      icon: <RefreshCw size={15} className="text-rose-400" />,
+      icon: <RefreshCw size={14} className="text-rose-400" />,
       run: onResetVFS,
     },
   ];
 
-  // Themes
   const themeItems = Object.values(THEMES).map((t) => ({
     id: `theme-${t.id}`,
-    title: `Switch Theme to ${t.name}`,
-    category: 'Themes',
-    icon: <Palette size={15} className="text-purple-400" />,
+    title: `Theme: ${t.name}${currentTheme === t.id ? ' (Active)' : ''} — ${t.tagline}`,
+    category: 'Appearance',
+    icon: <Palette size={14} style={{ color: t.accent }} />,
     run: () => onSelectTheme?.(t.id),
   }));
 
-  // Missions
   const missionItems = missions.map((m) => ({
     id: `mission-${m.id}`,
-    title: `Mission: ${m.title} (${m.difficulty})`,
-    category: 'Missions',
+    title: `Verify Mission: ${m.title} · ${m.difficulty}`,
+    category: 'Curriculum',
     icon: m.completed ? (
-      <CheckCircle2 size={15} className="text-emerald-400" />
+      <CheckCircle2 size={14} className="text-emerald-400" />
     ) : (
-      <Trophy size={15} className="text-amber-400" />
+      <Trophy size={14} className="text-amber-400" />
     ),
     run: () => onSelectMission?.(m.id),
   }));
 
-  // Filter items
   const allItems = [...actions, ...themeItems, ...missionItems];
   const q = query.toLowerCase().trim();
   const filtered = allItems.filter(
     (item) =>
-      item.title.toLowerCase().includes(q) ||
-      item.category.toLowerCase().includes(q)
+      item.title.toLowerCase().includes(q) || item.category.toLowerCase().includes(q)
   );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -185,37 +180,59 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 bg-black/60 backdrop-blur-sm animate-fadeIn select-none"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 bg-black/70 backdrop-blur-xs animate-fadeIn select-none"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl flex flex-col rounded-2xl bg-[#141624] border border-white/10 shadow-2xl overflow-hidden text-slate-200"
+        className="w-full max-w-xl flex flex-col rounded-xl border shadow-2xl overflow-hidden"
+        style={{
+          background: 'var(--theme-surface)',
+          borderColor: 'var(--theme-border-strong)',
+          color: 'var(--theme-text)',
+        }}
       >
         {/* Search Input Bar */}
-        <div className="flex items-center gap-3 px-4 py-3 bg-[#181a2c] border-b border-white/10">
-          <Search size={18} className="text-slate-400 shrink-0" />
+        <div
+          className="flex items-center gap-3 px-4 py-3 border-b"
+          style={{
+            background: 'var(--theme-elevated)',
+            borderColor: 'var(--theme-border)',
+          }}
+        >
+          <Search size={16} style={{ color: 'var(--theme-accent)' }} className="shrink-0" />
           <input
             ref={inputRef}
             type="text"
-            placeholder="Type a command, jump to mission, or change theme..."
+            placeholder="Type a command, switch theme, or verify a mission..."
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
               setSelectedIndex(0);
             }}
             onKeyDown={handleKeyDown}
-            className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none"
+            className="flex-1 bg-transparent text-sm outline-none placeholder:opacity-45"
+            style={{ color: 'var(--theme-text)' }}
           />
-          <kbd className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[10px] font-mono text-slate-400">
+          <kbd
+            className="px-1.5 py-0.5 rounded border text-[10px] font-mono"
+            style={{
+              background: 'var(--theme-bg)',
+              borderColor: 'var(--theme-border)',
+              color: 'var(--theme-muted)',
+            }}
+          >
             ESC
           </kbd>
         </div>
 
         {/* Results List */}
-        <div className="max-h-80 overflow-y-auto p-2 space-y-1">
+        <div className="max-h-80 overflow-y-auto p-2 space-y-0.5">
           {filtered.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-500">
-              No matching commands or missions found for "{query}"
+            <div
+              className="p-8 text-center text-xs"
+              style={{ color: 'var(--theme-muted)' }}
+            >
+              No matching commands, themes, or missions found for &ldquo;{query}&rdquo;
             </div>
           ) : (
             filtered.map((item, idx) => {
@@ -228,22 +245,27 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                     onClose();
                   }}
                   onMouseEnter={() => setSelectedIndex(idx)}
-                  className={`flex items-center justify-between px-3 py-2 rounded-xl cursor-pointer transition-colors ${
-                    isSelected
-                      ? 'bg-blue-600/25 border border-blue-500/30 text-white'
-                      : 'hover:bg-white/5 border border-transparent text-slate-300'
-                  }`}
+                  className="flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors"
+                  style={{
+                    background: isSelected ? 'var(--theme-accent-soft)' : 'transparent',
+                    color: isSelected ? 'var(--theme-text)' : 'var(--theme-text-secondary)',
+                  }}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="shrink-0">{item.icon}</div>
                     <span className="text-xs font-medium truncate">{item.title}</span>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-slate-400">
+                  <div className="flex items-center gap-2 shrink-0 pl-2">
+                    <span
+                      className="text-[11px] font-mono"
+                      style={{ color: 'var(--theme-muted)' }}
+                    >
                       {item.category}
                     </span>
-                    {isSelected && <ChevronRight size={14} className="text-blue-400" />}
+                    {isSelected && (
+                      <ChevronRight size={13} style={{ color: 'var(--theme-accent)' }} />
+                    )}
                   </div>
                 </div>
               );
@@ -251,13 +273,20 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           )}
         </div>
 
-        {/* Footer shortcuts */}
-        <div className="flex items-center justify-between px-4 py-2 bg-[#121420] border-t border-white/5 text-[11px] text-slate-500">
-          <div className="flex items-center gap-3">
+        {/* Footer */}
+        <div
+          className="flex items-center justify-between px-4 py-2 border-t text-[11px] font-mono"
+          style={{
+            background: 'var(--theme-tab-bg)',
+            borderColor: 'var(--theme-border)',
+            color: 'var(--theme-muted)',
+          }}
+        >
+          <div className="flex items-center gap-4">
             <span>↑↓ Navigate</span>
-            <span>↵ Select</span>
+            <span>↵ Execute</span>
           </div>
-          <span>LinuxSim Spotlight</span>
+          <span>LinuxSim Command Spotlight</span>
         </div>
       </div>
     </div>

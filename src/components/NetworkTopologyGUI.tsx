@@ -2,11 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
   Network,
   Server,
-  Shield,
   Layers,
   Container,
   Cpu,
-  HardDrive,
   Globe,
   RefreshCw,
   ExternalLink,
@@ -29,7 +27,7 @@ interface NetworkTopologyGUIProps {
   vfs?: VirtualFileSystem;
 }
 
-type SelectedNodeType = 
+type SelectedNodeType =
   | { type: 'host'; id: string; name: string; ip: string }
   | { type: 'service'; id: string; name: string; service: ServiceState }
   | { type: 'docker-bridge'; id: string; name: string; ip: string }
@@ -44,11 +42,10 @@ export const NetworkTopologyGUI: React.FC<NetworkTopologyGUIProps> = ({
   onRunCommand,
   vfs,
 }) => {
-  const [refreshTick, setRefreshTick] = useState(0);
+  const [, setRefreshTick] = useState(0);
   const [selectedNode, setSelectedNode] = useState<SelectedNodeType | null>(null);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
-  // Poll state every 2s
   useEffect(() => {
     const timer = setInterval(() => {
       setRefreshTick((t) => t + 1);
@@ -63,13 +60,12 @@ export const NetworkTopologyGUI: React.FC<NetworkTopologyGUIProps> = ({
   const ufwState = getUfwState();
 
   const isSdb1Mounted = storageState.devices.some(
-    (d: BlockDevice) => (d.name === 'sdb1' && !!d.mountpoint) ||
+    (d: BlockDevice) =>
+      (d.name === 'sdb1' && !!d.mountpoint) ||
       d.children?.some((c: BlockDevice) => c.name === 'sdb1' && !!c.mountpoint)
   );
 
-  const runningContainers = dockerState.containers.filter(
-    (c) => c.status === 'running'
-  );
+  const runningContainers = dockerState.containers.filter((c) => c.status === 'running');
 
   const triggerFeedback = (msg: string) => {
     setActionFeedback(msg);
@@ -83,7 +79,7 @@ export const NetworkTopologyGUI: React.FC<NetworkTopologyGUIProps> = ({
       state.services[serviceName].pid = Math.floor(Math.random() * 2000) + 1000;
       saveSysAdminState(state);
       setRefreshTick((t) => t + 1);
-      triggerFeedback(`Service ${serviceName} restarted (PID ${state.services[serviceName].pid})`);
+      triggerFeedback(`Restarted ${serviceName}.service (PID ${state.services[serviceName].pid})`);
       if (onRunCommand) onRunCommand(`systemctl restart ${serviceName}`);
     }
   };
@@ -96,8 +92,9 @@ export const NetworkTopologyGUI: React.FC<NetworkTopologyGUIProps> = ({
     const newReplicas = Math.max(0, dep.replicas + delta);
     dep.replicas = newReplicas;
 
-    // Adjust pods
-    const existingPods = k8s.pods.filter((p: K8sPod) => p.deployment === dep.name || p.name.startsWith(dep.name));
+    const existingPods = k8s.pods.filter(
+      (p: K8sPod) => p.deployment === dep.name || p.name.startsWith(dep.name)
+    );
     if (existingPods.length < newReplicas) {
       for (let i = existingPods.length; i < newReplicas; i++) {
         const hash = Math.random().toString(36).substring(2, 7);
@@ -127,17 +124,17 @@ export const NetworkTopologyGUI: React.FC<NetworkTopologyGUIProps> = ({
 
     saveK8sState(k8s);
     setRefreshTick((t) => t + 1);
-    triggerFeedback(`Scaled ${dep.name} to ${newReplicas} replicas`);
-    if (onRunCommand) onRunCommand(`kubectl scale deployment ${dep.name} --replicas=${newReplicas}`);
+    triggerFeedback(`Scaled deployment/${dep.name} to ${newReplicas} replicas`);
+    if (onRunCommand)
+      onRunCommand(`kubectl scale deployment ${dep.name} --replicas=${newReplicas}`);
   };
 
   const handleCurlCheck = (target: string) => {
-    triggerFeedback(`Probing ${target}... HTTP/1.1 200 OK`);
+    triggerFeedback(`Probing ${target} → HTTP/1.1 200 OK`);
     if (onRunCommand) onRunCommand(`curl -I ${target}`);
   };
 
-  // Check /etc/hosts content for DNS aliases
-  let hostsAliases = ['localhost', 'linux-box'];
+  const hostsAliases = ['localhost', 'linux-box'];
   if (vfs) {
     const hostsNode = vfs.getNode('/etc/hosts', true);
     if (hostsNode && hostsNode.content) {
@@ -155,52 +152,60 @@ export const NetworkTopologyGUI: React.FC<NetworkTopologyGUIProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#0d101a] border-l border-white/5 text-slate-200 overflow-hidden font-sans select-none">
-      {/* Top Header */}
-      <div className="flex items-center justify-between px-3.5 py-2.5 bg-[#121626] border-b border-white/5 shrink-0">
+    <div
+      className="flex flex-col h-full border-l overflow-hidden font-sans select-none"
+      style={{
+        background: 'var(--theme-surface)',
+        borderColor: 'var(--theme-border)',
+        color: 'var(--theme-text)',
+      }}
+    >
+      {/* Header */}
+      <div
+        className="flex items-center justify-between px-3.5 h-10 border-b shrink-0"
+        style={{
+          background: 'var(--theme-tab-bg)',
+          borderColor: 'var(--theme-border)',
+        }}
+      >
         <div className="flex items-center gap-2">
-          <div className="p-1 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20">
-            <Network size={15} />
-          </div>
-          <div>
-            <h2 className="text-xs font-semibold text-slate-100 tracking-wide uppercase">
-              Network Topology Map <span className="text-[9px] text-slate-500 font-mono font-normal">#{refreshTick}</span>
-            </h2>
-            <p className="text-[10px] text-slate-400">Live Host, Bridge, K8s & Service Mesh</p>
-          </div>
+          <Network size={14} className="text-cyan-400" />
+          <span className="text-xs font-semibold tracking-tight">Infrastructure Topology</span>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           <button
             onClick={() => setRefreshTick((t) => t + 1)}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-md transition-colors"
+            className="p-1.5 rounded-md hover:bg-white/[0.06] transition-colors"
+            style={{ color: 'var(--theme-text-secondary)' }}
             title="Refresh Topology"
           >
-            <RefreshCw size={13} />
+            <RefreshCw size={12} />
           </button>
           {onClose && (
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-md transition-colors"
+              className="p-1.5 rounded-md hover:bg-white/[0.06] transition-colors"
+              style={{ color: 'var(--theme-text-secondary)' }}
               title="Close Topology Panel"
             >
-              <X size={14} />
+              <X size={13} />
             </button>
           )}
         </div>
       </div>
 
-      {/* Action feedback banner */}
+      {/* Feedback Banner */}
       {actionFeedback && (
-        <div className="px-3 py-1 bg-emerald-500/15 border-b border-emerald-500/30 text-emerald-300 text-[11px] font-mono flex items-center gap-1.5 animate-fadeIn">
+        <div className="px-3.5 py-1.5 bg-emerald-500/15 border-b border-emerald-500/30 text-emerald-300 text-[11px] font-mono flex items-center gap-1.5 animate-fadeIn">
           <CheckCircle2 size={12} className="shrink-0" />
           <span>{actionFeedback}</span>
         </div>
       )}
 
-      {/* Main Diagram Area */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-4">
-        {/* Tier 1: Local Host (linux-box) */}
+      {/* Connected Node Architecture */}
+      <div className="flex-1 overflow-y-auto p-3.5 space-y-2">
+        {/* Node Tier 1: Local Host */}
         <div
           onClick={() =>
             setSelectedNode({
@@ -210,59 +215,81 @@ export const NetworkTopologyGUI: React.FC<NetworkTopologyGUIProps> = ({
               ip: '10.0.0.2',
             })
           }
-          className={`cursor-pointer p-3 rounded-xl border transition-all ${
-            selectedNode?.id === 'local-host'
-              ? 'bg-blue-950/30 border-blue-500/50 shadow-md shadow-blue-500/10'
-              : 'bg-[#15192b]/80 border-white/5 hover:border-white/10 hover:bg-[#181d33]'
-          }`}
+          className="cursor-pointer p-3.5 rounded-xl border transition-all"
+          style={{
+            background:
+              selectedNode?.id === 'local-host'
+                ? 'var(--theme-elevated)'
+                : 'var(--theme-card-bg)',
+            borderColor:
+              selectedNode?.id === 'local-host'
+                ? 'var(--theme-accent)'
+                : 'var(--theme-border)',
+          }}
         >
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-1.5">
             <div className="flex items-center gap-2">
-              <Server size={16} className="text-blue-400" />
-              <span className="text-xs font-semibold text-slate-100">Local Host (linux-box)</span>
+              <Server size={14} style={{ color: 'var(--theme-dir)' }} />
+              <span className="text-xs font-semibold">Local Host (linux-box)</span>
             </div>
-            <span className="text-[10px] font-mono text-blue-300/80 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
-              10.0.0.2 / eth0
+            <span
+              className="text-[11px] font-mono tabular-nums"
+              style={{ color: 'var(--theme-dir)' }}
+            >
+              10.0.0.2/24 · eth0
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-[11px]">
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <Shield
-                size={13}
-                className={ufwState.enabled ? 'text-emerald-400' : 'text-slate-500'}
-              />
-              <span>UFW:</span>
-              <span
-                className={`font-mono text-[10px] font-semibold px-1 rounded ${
-                  ufwState.enabled
-                    ? 'text-emerald-300 bg-emerald-500/15'
-                    : 'text-slate-400 bg-slate-500/15'
-                }`}
-              >
-                {ufwState.enabled ? 'ACTIVE' : 'INACTIVE'}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <HardDrive size={13} className="text-slate-400" />
-              <span>Storage:</span>
-              <span className="font-mono text-[10px] text-slate-300">
-                sda1 (/) {isSdb1Mounted ? '• sdb1 (mnt)' : ''}
-              </span>
-            </div>
+          <div
+            className="flex items-center gap-2 text-[11px] font-mono"
+            style={{ color: 'var(--theme-text-secondary)' }}
+          >
+            <span>
+              UFW:{' '}
+              <strong className={ufwState.enabled ? 'text-emerald-400' : 'text-amber-400'}>
+                {ufwState.enabled ? 'active' : 'inactive'}
+              </strong>
+            </span>
+            <span className="opacity-30">·</span>
+            <span>sda1 (/)</span>
+            {isSdb1Mounted && (
+              <>
+                <span className="opacity-30">·</span>
+                <span className="text-emerald-400">sdb1 (/mnt/data)</span>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Tier 2: Systemd Services Layer */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between px-1">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        {/* Vertical Architecture Connector */}
+        <div className="flex items-center pl-5 py-0.5">
+          <div className="w-px h-3.5 bg-white/15" />
+          <span
+            className="ml-2 text-[10px] font-mono"
+            style={{ color: 'var(--theme-muted)' }}
+          >
+            systemd.slice · loopback &amp; host sockets
+          </span>
+        </div>
+
+        {/* Node Tier 2: Systemd Services */}
+        <div
+          className="p-3 rounded-xl border space-y-2.5"
+          style={{
+            background: 'var(--theme-card-bg)',
+            borderColor: 'var(--theme-border)',
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs font-semibold">
               <Layers size={13} className="text-purple-400" />
               <span>Systemd Daemons</span>
             </div>
-            <span className="text-[10px] font-mono text-slate-500">
-              {Object.values(sysState.services).filter((s) => s.status === 'running').length} active
+            <span
+              className="text-[11px] font-mono tabular-nums"
+              style={{ color: 'var(--theme-text-secondary)' }}
+            >
+              {Object.values(sysState.services).filter((s) => s.status === 'running').length} running
             </span>
           </div>
 
@@ -281,27 +308,27 @@ export const NetworkTopologyGUI: React.FC<NetworkTopologyGUIProps> = ({
                       service: svc,
                     })
                   }
-                  className={`cursor-pointer p-2 rounded-lg border transition-all ${
-                    isSelected
-                      ? 'bg-purple-950/30 border-purple-500/50 shadow'
-                      : 'bg-[#15192b]/60 border-white/5 hover:border-white/10 hover:bg-[#181d33]'
-                  }`}
+                  className="cursor-pointer p-2.5 rounded-lg border transition-all"
+                  style={{
+                    background: isSelected ? 'var(--theme-elevated)' : 'var(--theme-bg)',
+                    borderColor: isSelected ? '#a855f7' : 'var(--theme-border)',
+                  }}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-slate-200 capitalize">
-                      {svc.name}
-                    </span>
+                    <span className="text-xs font-medium font-mono">{svc.name}</span>
                     <span
-                      className={`w-2 h-2 rounded-full ${
-                        isRunning ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-slate-600'
+                      className={`text-[10px] font-mono ${
+                        isRunning ? 'text-emerald-400' : 'text-slate-500'
                       }`}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                    <span>:{svc.port || '—'}</span>
-                    <span className={isRunning ? 'text-emerald-400' : 'text-slate-500'}>
-                      {svc.status}
+                    >
+                      {isRunning ? 'up' : 'down'}
                     </span>
+                  </div>
+                  <div
+                    className="text-[10px] font-mono tabular-nums"
+                    style={{ color: 'var(--theme-text-secondary)' }}
+                  >
+                    {svc.port ? `TCP :${svc.port}` : 'background'} · PID {svc.pid || '—'}
                   </div>
                 </div>
               );
@@ -309,29 +336,53 @@ export const NetworkTopologyGUI: React.FC<NetworkTopologyGUIProps> = ({
           </div>
         </div>
 
-        {/* Tier 3: Docker Bridge (docker0) */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between px-1">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        {/* Vertical Architecture Connector */}
+        <div className="flex items-center pl-5 py-0.5">
+          <div className="w-px h-3.5 bg-white/15" />
+          <span
+            className="ml-2 text-[10px] font-mono"
+            style={{ color: 'var(--theme-muted)' }}
+          >
+            docker0 bridge · 172.17.0.1/16
+          </span>
+        </div>
+
+        {/* Node Tier 3: Docker Bridge */}
+        <div
+          className="p-3 rounded-xl border space-y-2.5"
+          style={{
+            background: 'var(--theme-card-bg)',
+            borderColor: 'var(--theme-border)',
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs font-semibold">
               <Container size={13} className="text-cyan-400" />
-              <span>Docker Bridge (docker0)</span>
+              <span>Docker Containers</span>
             </div>
-            <span className="text-[10px] font-mono text-cyan-300/80 bg-cyan-500/10 px-1.5 py-0.2 rounded border border-cyan-500/20">
-              172.17.0.1/16
+            <span className="text-[11px] font-mono tabular-nums text-cyan-400">
+              172.17.0.0/16
             </span>
           </div>
 
           {runningContainers.length === 0 ? (
-            <div className="p-3 rounded-lg border border-dashed border-white/10 text-center text-xs text-slate-500">
-              No containers running on docker0 bridge
+            <div
+              className="p-2.5 rounded-lg border border-dashed text-center text-xs"
+              style={{
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-muted)',
+              }}
+            >
+              No running containers attached to docker0
             </div>
           ) : (
             <div className="space-y-1.5">
               {runningContainers.map((c) => {
                 const isSelected = selectedNode?.id === `docker-${c.id}`;
-                const portsStr = c.ports && c.ports.length > 0
-                  ? c.ports.map((p) => `${p.hostPort}->${p.containerPort}`).join(', ')
-                  : 'bridged';
+                const portsStr =
+                  c.ports && c.ports.length > 0
+                    ? c.ports.map((p) => `${p.hostPort}→${p.containerPort}`).join(', ')
+                    : 'internal';
                 return (
                   <div
                     key={c.id}
@@ -345,24 +396,23 @@ export const NetworkTopologyGUI: React.FC<NetworkTopologyGUIProps> = ({
                         status: c.status,
                       })
                     }
-                    className={`cursor-pointer p-2.5 rounded-lg border transition-all ${
-                      isSelected
-                        ? 'bg-cyan-950/30 border-cyan-500/50 shadow'
-                        : 'bg-[#15192b]/60 border-white/5 hover:border-white/10 hover:bg-[#181d33]'
-                    }`}
+                    className="cursor-pointer p-2.5 rounded-lg border transition-all"
+                    style={{
+                      background: isSelected ? 'var(--theme-elevated)' : 'var(--theme-bg)',
+                      borderColor: isSelected ? '#22d3ee' : 'var(--theme-border)',
+                    }}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Container size={14} className="text-cyan-400" />
-                        <span className="text-xs font-medium text-slate-200">{c.name}</span>
-                      </div>
-                      <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium font-mono">{c.name}</span>
+                      <span className="text-[11px] font-mono tabular-nums text-emerald-400">
                         {portsStr}
                       </span>
                     </div>
-                    <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                      <span>{c.image}</span>
-                      <span className="text-slate-500">{c.id.substring(0, 10)}</span>
+                    <div
+                      className="mt-0.5 text-[10px] font-mono"
+                      style={{ color: 'var(--theme-text-secondary)' }}
+                    >
+                      {c.image} · {c.id.substring(0, 10)}
                     </div>
                   </div>
                 );
@@ -371,87 +421,108 @@ export const NetworkTopologyGUI: React.FC<NetworkTopologyGUIProps> = ({
           )}
         </div>
 
-        {/* Tier 4: Kubernetes Cluster (k8s-default) */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between px-1">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        {/* Vertical Architecture Connector */}
+        <div className="flex items-center pl-5 py-0.5">
+          <div className="w-px h-3.5 bg-white/15" />
+          <span
+            className="ml-2 text-[10px] font-mono"
+            style={{ color: 'var(--theme-muted)' }}
+          >
+            cni0 pod network · 10.244.0.0/16
+          </span>
+        </div>
+
+        {/* Node Tier 4: Kubernetes Cluster */}
+        <div
+          className="p-3 rounded-xl border space-y-2.5"
+          style={{
+            background: 'var(--theme-card-bg)',
+            borderColor: 'var(--theme-border)',
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs font-semibold">
               <Cpu size={13} className="text-indigo-400" />
-              <span>Kubernetes (k8s-default)</span>
+              <span>Kubernetes Control Plane</span>
             </div>
-            <span className="text-[10px] font-mono text-indigo-300/80 bg-indigo-500/10 px-1.5 py-0.2 rounded border border-indigo-500/20">
-              10.244.0.0/16
-            </span>
+            <span className="text-[11px] font-mono text-emerald-400">Ready</span>
           </div>
 
-          <div className="p-3 rounded-xl bg-[#15192b]/60 border border-white/5 space-y-2">
-            <div className="flex items-center justify-between text-[11px] text-slate-300 pb-1.5 border-b border-white/5">
-              <span>Control Plane Node:</span>
-              <span className="font-mono text-emerald-400 font-semibold">
-                {k8sState.nodes[0]?.name || 'linux-box-control-plane'} (Ready)
-              </span>
-            </div>
-
-            {/* Deployments */}
-            <div className="space-y-1">
-              <div className="text-[10px] font-medium text-slate-400 uppercase">Deployments</div>
-              {k8sState.deployments.length === 0 ? (
-                <p className="text-[11px] text-slate-500 italic">No deployments found</p>
-              ) : (
-                k8sState.deployments.map((dep: K8sDeployment) => (
-                  <div
-                    key={dep.name}
-                    onClick={() =>
-                      setSelectedNode({
-                        type: 'k8s-deployment',
-                        id: `dep-${dep.name}`,
-                        name: dep.name,
-                        replicas: dep.replicas,
-                        image: dep.image,
-                      })
-                    }
-                    className="flex items-center justify-between p-1.5 rounded bg-black/20 hover:bg-black/40 border border-white/5 cursor-pointer text-xs"
+          <div className="space-y-1.5">
+            {k8sState.deployments.map((dep: K8sDeployment) => {
+              const isSelected = selectedNode?.id === `dep-${dep.name}`;
+              return (
+                <div
+                  key={dep.name}
+                  onClick={() =>
+                    setSelectedNode({
+                      type: 'k8s-deployment',
+                      id: `dep-${dep.name}`,
+                      name: dep.name,
+                      replicas: dep.replicas,
+                      image: dep.image,
+                    })
+                  }
+                  className="flex items-center justify-between p-2 rounded-lg border cursor-pointer text-xs transition-colors"
+                  style={{
+                    background: isSelected ? 'var(--theme-elevated)' : 'var(--theme-bg)',
+                    borderColor: isSelected ? '#818cf8' : 'var(--theme-border)',
+                  }}
+                >
+                  <span className="font-mono font-medium">deploy/{dep.name}</span>
+                  <span
+                    className="text-[11px] font-mono tabular-nums"
+                    style={{ color: 'var(--theme-text-secondary)' }}
                   >
-                    <span className="font-medium text-slate-200">{dep.name}</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300">
-                        {dep.replicas} Replicas
-                      </span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+                    {dep.replicas} replicas · {dep.image}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
 
-            {/* Pod badges */}
-            <div className="pt-1.5 border-t border-white/5">
-              <div className="text-[10px] font-medium text-slate-400 uppercase mb-1">
-                Active Pods ({k8sState.pods.length})
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {k8sState.pods.map((pod: K8sPod) => (
-                  <button
-                    key={pod.name}
-                    onClick={() =>
-                      setSelectedNode({
-                        type: 'k8s-pod',
-                        id: `pod-${pod.name}`,
-                        name: pod.name,
-                        podIp: pod.ip,
-                        status: pod.status,
-                      })
-                    }
-                    className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-950/40 border border-indigo-500/30 text-[10px] font-mono text-indigo-300 hover:bg-indigo-900/50"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    <span>{pod.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+          <div
+            className="pt-2 border-t flex flex-wrap gap-1.5"
+            style={{ borderColor: 'var(--theme-border)' }}
+          >
+            {k8sState.pods.map((pod: K8sPod) => (
+              <button
+                key={pod.name}
+                onClick={() =>
+                  setSelectedNode({
+                    type: 'k8s-pod',
+                    id: `pod-${pod.name}`,
+                    name: pod.name,
+                    podIp: pod.ip,
+                    status: pod.status,
+                  })
+                }
+                className="px-2 py-1 rounded-md border text-[10px] font-mono transition-colors hover:border-indigo-400/50"
+                style={{
+                  background: 'var(--theme-bg)',
+                  borderColor:
+                    selectedNode?.id === `pod-${pod.name}` ? '#818cf8' : 'var(--theme-border)',
+                  color: 'var(--theme-text)',
+                }}
+              >
+                pod/{pod.name} · <span className="text-emerald-400">{pod.ip}</span>
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Tier 5: Remote Production Host (prod-node) */}
+        {/* Vertical Architecture Connector */}
+        <div className="flex items-center pl-5 py-0.5">
+          <div className="w-px h-3.5 bg-white/15" />
+          <span
+            className="ml-2 text-[10px] font-mono"
+            style={{ color: 'var(--theme-muted)' }}
+          >
+            VPC peer link · 10.0.0.0/24
+          </span>
+        </div>
+
+        {/* Node Tier 5: Remote Production Host */}
         <div
           onClick={() =>
             setSelectedNode({
@@ -461,89 +532,110 @@ export const NetworkTopologyGUI: React.FC<NetworkTopologyGUIProps> = ({
               ip: '10.0.0.5',
             })
           }
-          className={`cursor-pointer p-3 rounded-xl border transition-all ${
-            selectedNode?.id === 'prod-node'
-              ? 'bg-emerald-950/30 border-emerald-500/50 shadow'
-              : 'bg-[#15192b]/80 border-white/5 hover:border-white/10 hover:bg-[#181d33]'
-          }`}
+          className="cursor-pointer p-3.5 rounded-xl border transition-all"
+          style={{
+            background:
+              selectedNode?.id === 'prod-node'
+                ? 'var(--theme-elevated)'
+                : 'var(--theme-card-bg)',
+            borderColor:
+              selectedNode?.id === 'prod-node' ? '#10b981' : 'var(--theme-border)',
+          }}
         >
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
-              <Globe size={16} className="text-emerald-400" />
-              <span className="text-xs font-semibold text-slate-100">
-                Remote Production Host (prod-node)
-              </span>
+              <Globe size={14} className="text-emerald-400" />
+              <span className="text-xs font-semibold">Remote Host (prod-node)</span>
             </div>
-            <span className="text-[10px] font-mono text-emerald-300/80 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-              10.0.0.5 / Virtual Link
+            <span className="text-[11px] font-mono tabular-nums text-emerald-400">
+              10.0.0.5
             </span>
           </div>
 
-          <div className="flex items-center justify-between text-[11px] text-slate-400">
-            <span>DNS Aliases: {hostsAliases.filter((a) => a.includes('prod')).join(', ') || 'prod-node.internal'}</span>
-            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-              SSH Auth: Key Ready
-            </span>
+          <div
+            className="text-[11px] font-mono"
+            style={{ color: 'var(--theme-text-secondary)' }}
+          >
+            DNS: {hostsAliases.filter((a) => a.includes('prod')).join(', ') || 'prod-node.internal'}{' '}
+            · SSH RSA Ready
           </div>
         </div>
       </div>
 
-      {/* Interactive Node Inspector Drawer / Bottom Card */}
+      {/* Interactive Node Inspector Drawer */}
       {selectedNode && (
-        <div className="p-3 bg-[#131728] border-t border-white/10 shrink-0 space-y-2 animate-slideUp">
+        <div
+          className="p-3.5 border-t shrink-0 space-y-2.5 animate-fadeIn"
+          style={{
+            background: 'var(--theme-elevated)',
+            borderColor: 'var(--theme-border-strong)',
+          }}
+        >
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <Sliders size={14} className="text-blue-400" />
-              <span className="text-xs font-semibold text-slate-100">Node Inspector</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white/5 text-slate-400">
+            <div className="flex items-center gap-2 text-xs">
+              <Sliders size={13} style={{ color: 'var(--theme-accent)' }} />
+              <span className="font-semibold">{selectedNode.name}</span>
+              <span className="opacity-30">·</span>
+              <span
+                className="text-[11px] font-mono"
+                style={{ color: 'var(--theme-text-secondary)' }}
+              >
                 {selectedNode.type}
               </span>
             </div>
             <button
               onClick={() => setSelectedNode(null)}
-              className="text-slate-400 hover:text-white p-0.5 rounded"
+              className="p-1 rounded opacity-60 hover:opacity-100"
             >
               <X size={13} />
             </button>
           </div>
 
-          <div className="text-xs text-slate-300">
-            <div className="font-medium text-slate-100">{selectedNode.name}</div>
+          <div
+            className="text-[11px] font-mono"
+            style={{ color: 'var(--theme-text-secondary)' }}
+          >
             {selectedNode.type === 'service' && (
-              <div className="text-[11px] text-slate-400 mt-0.5">
-                Port: {selectedNode.service.port || 'None'} • Status: {selectedNode.service.status}
-              </div>
+              <span>
+                Port: {selectedNode.service.port || 'none'} · Status: {selectedNode.service.status}
+              </span>
             )}
             {selectedNode.type === 'k8s-deployment' && (
-              <div className="text-[11px] text-slate-400 mt-0.5">
-                Image: {selectedNode.image} • Desired Replicas: {selectedNode.replicas}
-              </div>
+              <span>
+                Image: {selectedNode.image} · Replicas: {selectedNode.replicas}
+              </span>
             )}
             {selectedNode.type === 'docker-container' && (
-              <div className="text-[11px] text-slate-400 mt-0.5">
-                Ports: {selectedNode.ports} • Status: {selectedNode.status}
-              </div>
+              <span>
+                Ports: {selectedNode.ports} · Status: {selectedNode.status}
+              </span>
             )}
+            {selectedNode.type === 'k8s-pod' && (
+              <span>
+                Pod IP: {selectedNode.podIp} · Phase: {selectedNode.status}
+              </span>
+            )}
+            {selectedNode.type === 'host' && <span>Interface eth0 · 10.0.0.2/24</span>}
+            {selectedNode.type === 'remote-host' && <span>Peer Node · 10.0.0.5/24</span>}
           </div>
 
-          {/* Quick Action Buttons */}
-          <div className="flex flex-wrap gap-1.5 pt-1">
+          <div className="flex flex-wrap gap-1.5">
             {selectedNode.type === 'service' && (
               <>
                 <button
                   onClick={() => handleRestartService(selectedNode.name)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-medium transition-all"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 text-xs font-medium transition-colors"
                 >
                   <RotateCcw size={11} />
-                  <span>Restart Service</span>
+                  <span>Restart Daemon</span>
                 </button>
                 {selectedNode.service.port && (
                   <button
                     onClick={() => handleCurlCheck(`http://localhost:${selectedNode.service.port}`)}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-medium transition-all"
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/30 text-xs font-medium transition-colors"
                   >
                     <ExternalLink size={11} />
-                    <span>Run curl check</span>
+                    <span>Probe HTTP</span>
                   </button>
                 )}
               </>
@@ -553,15 +645,15 @@ export const NetworkTopologyGUI: React.FC<NetworkTopologyGUIProps> = ({
               <>
                 <button
                   onClick={() => handleScaleDeployment(selectedNode.name, 1)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-medium transition-all"
+                  className="px-2.5 py-1 rounded-md bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 text-xs font-medium transition-colors"
                 >
-                  <span>Scale +1 Pod</span>
+                  Scale +1 Replica
                 </button>
                 <button
                   onClick={() => handleScaleDeployment(selectedNode.name, -1)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-medium transition-all"
+                  className="px-2.5 py-1 rounded-md bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-medium transition-colors"
                 >
-                  <span>Scale -1 Pod</span>
+                  Scale -1 Replica
                 </button>
               </>
             )}
@@ -569,17 +661,17 @@ export const NetworkTopologyGUI: React.FC<NetworkTopologyGUIProps> = ({
             {selectedNode.type === 'remote-host' && (
               <>
                 <button
-                  onClick={() => handleCurlCheck(`http://10.0.0.5`)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-medium transition-all"
+                  onClick={() => handleCurlCheck('http://10.0.0.5')}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-medium transition-colors"
                 >
                   <ExternalLink size={11} />
                   <span>Probe HTTP</span>
                 </button>
                 <button
                   onClick={() => onRunCommand?.('ssh deploy@10.0.0.5')}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 text-xs font-medium transition-all"
+                  className="px-2.5 py-1 rounded-md bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-xs font-medium transition-colors"
                 >
-                  <span>SSH Connect</span>
+                  SSH Connect
                 </button>
               </>
             )}
@@ -587,18 +679,20 @@ export const NetworkTopologyGUI: React.FC<NetworkTopologyGUIProps> = ({
             {selectedNode.type === 'host' && (
               <button
                 onClick={() => onRunCommand?.('lsblk')}
-                className="flex items-center gap-1 px-2.5 py-1 rounded bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-medium transition-all"
+                className="px-2.5 py-1 rounded-md bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/30 text-xs font-medium transition-colors"
               >
-                <span>Run lsblk</span>
+                Inspect Block Devices (lsblk)
               </button>
             )}
 
             {selectedNode.type === 'docker-container' && (
               <button
-                onClick={() => onRunCommand?.(`docker logs ${selectedNode.id.replace('docker-', '')}`)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 text-xs font-medium transition-all"
+                onClick={() =>
+                  onRunCommand?.(`docker logs ${selectedNode.id.replace('docker-', '')}`)
+                }
+                className="px-2.5 py-1 rounded-md bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-xs font-medium transition-colors"
               >
-                <span>View Container Logs</span>
+                Tail Container Logs
               </button>
             )}
           </div>

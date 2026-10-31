@@ -85,10 +85,9 @@ export const LabBuilderModal: React.FC<LabBuilderModalProps> = ({
     currentList.push(newCustomMission);
     saveCustomMissions(currentList);
 
-    showNotif('Custom Mission successfully created!');
+    showNotif('Custom lab mission published to curriculum.');
     onMissionsUpdated();
 
-    // Reset form
     setTitle('');
     setDescription('');
     setHint('');
@@ -128,7 +127,7 @@ export const LabBuilderModal: React.FC<LabBuilderModalProps> = ({
           }
           saveCustomMissions(current);
           onMissionsUpdated();
-          showNotif(`Imported ${parsed.length} custom mission(s)!`);
+          showNotif(`Imported ${parsed.length} custom mission(s)`);
         }
       } catch {
         showNotif('Failed to import JSON: Invalid format');
@@ -139,37 +138,60 @@ export const LabBuilderModal: React.FC<LabBuilderModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn select-none">
-      <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl bg-[#121422] border border-white/10 shadow-2xl overflow-hidden text-slate-200">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fadeIn select-none"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-xl border shadow-2xl overflow-hidden"
+        style={{
+          background: 'var(--theme-surface)',
+          borderColor: 'var(--theme-border-strong)',
+          color: 'var(--theme-text)',
+        }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/10 bg-[#16192b]">
+        <div
+          className="flex items-center justify-between px-5 py-3.5 border-b"
+          style={{
+            background: 'var(--theme-tab-bg)',
+            borderColor: 'var(--theme-border)',
+          }}
+        >
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
-              <FlaskConical size={18} />
-            </div>
+            <FlaskConical size={17} style={{ color: 'var(--theme-accent)' }} />
             <div>
-              <h2 className="text-sm font-semibold text-white tracking-wide">
-                Custom Mission & Lab Builder
-              </h2>
-              <p className="text-xs text-slate-400">Design no-code automated Linux practice challenges</p>
+              <h2 className="text-sm font-bold tracking-tight">Custom Lab Builder</h2>
+              <p className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
+                Author automated Linux verification scenarios and state assertions
+              </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={handleExportJSON}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/5 transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border hover:bg-white/[0.06] transition-colors"
+              style={{
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-text-secondary)',
+              }}
               title="Export Custom Labs JSON"
             >
-              <Download size={13} />
+              <Download size={12} />
               <span className="hidden sm:inline">Export</span>
             </button>
             <button
               onClick={() => importFileRef.current?.click()}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/5 transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border hover:bg-white/[0.06] transition-colors"
+              style={{
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-text-secondary)',
+              }}
               title="Import Custom Labs JSON"
             >
-              <Upload size={13} />
+              <Upload size={12} />
               <span className="hidden sm:inline">Import</span>
             </button>
             <input
@@ -182,42 +204,51 @@ export const LabBuilderModal: React.FC<LabBuilderModalProps> = ({
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+              className="p-1.5 rounded-lg hover:bg-white/[0.06] transition-colors"
+              style={{ color: 'var(--theme-text-secondary)' }}
             >
               <X size={16} />
             </button>
           </div>
         </div>
 
-        {/* Notification banner */}
         {notification && (
-          <div className="px-5 py-1.5 bg-purple-500/20 border-b border-purple-500/30 text-purple-300 text-xs font-medium flex items-center gap-2">
+          <div className="px-5 py-2 bg-emerald-500/15 border-b border-emerald-500/30 text-emerald-300 text-xs font-medium flex items-center gap-2">
             <CheckCircle2 size={14} className="shrink-0" />
             <span>{notification}</span>
           </div>
         )}
 
-        {/* Scrollable Form Body */}
+        {/* Form Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
-          {/* Title & Difficulty */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-2 space-y-1">
-              <label className="font-semibold text-slate-300">Mission Title</label>
+            <div className="sm:col-span-2 space-y-1.5">
+              <label className="font-semibold block">Mission Title</label>
               <input
                 type="text"
-                placeholder="e.g., Secure Nginx Configuration"
+                placeholder="e.g., Harden SSH Daemon Configuration"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white placeholder-slate-500 outline-none focus:border-purple-500/50"
+                className="w-full px-3 py-2 rounded-lg border outline-none"
+                style={{
+                  background: 'var(--theme-bg)',
+                  borderColor: 'var(--theme-border)',
+                  color: 'var(--theme-text)',
+                }}
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="font-semibold text-slate-300">Difficulty Tier</label>
+            <div className="space-y-1.5">
+              <label className="font-semibold block">Difficulty Tier</label>
               <select
                 value={difficulty}
                 onChange={(e) => setDifficulty(e.target.value as CustomMission['difficulty'])}
-                className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white outline-none focus:border-purple-500/50 cursor-pointer"
+                className="w-full px-3 py-2 rounded-lg border outline-none cursor-pointer"
+                style={{
+                  background: 'var(--theme-bg)',
+                  borderColor: 'var(--theme-border)',
+                  color: 'var(--theme-text)',
+                }}
               >
                 <option value="beginner">Beginner</option>
                 <option value="intermediate">Intermediate</option>
@@ -230,44 +261,61 @@ export const LabBuilderModal: React.FC<LabBuilderModalProps> = ({
             </div>
           </div>
 
-          {/* Description */}
-          <div className="space-y-1">
-            <label className="font-semibold text-slate-300">Objective / Instructions</label>
+          <div className="space-y-1.5">
+            <label className="font-semibold block">Objective &amp; Instructions</label>
             <textarea
               rows={2}
-              placeholder="Explain the lab goal, commands to run, or files to create..."
+              placeholder="Describe the target outcome, files to modify, or services to configure..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white placeholder-slate-500 outline-none focus:border-purple-500/50 resize-none"
+              className="w-full px-3 py-2 rounded-lg border outline-none resize-none"
+              style={{
+                background: 'var(--theme-bg)',
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-text)',
+              }}
             />
           </div>
 
-          {/* Hint */}
-          <div className="space-y-1">
-            <label className="font-semibold text-slate-300">Hint (Optional)</label>
+          <div className="space-y-1.5">
+            <label className="font-semibold block">Hint (Optional)</label>
             <input
               type="text"
-              placeholder="e.g., Use chmod 644 and check with ls -l"
+              placeholder="e.g., Check permissions with ls -l and restart ssh"
               value={hint}
               onChange={(e) => setHint(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white placeholder-slate-500 outline-none focus:border-purple-500/50"
+              className="w-full px-3 py-2 rounded-lg border outline-none"
+              style={{
+                background: 'var(--theme-bg)',
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-text)',
+              }}
             />
           </div>
 
-          {/* Rule Builder */}
-          <div className="space-y-2 pt-2 border-t border-white/5">
+          {/* Validation Rules */}
+          <div
+            className="space-y-2.5 pt-3 border-t"
+            style={{ borderColor: 'var(--theme-border)' }}
+          >
             <div className="flex items-center justify-between">
               <div>
-                <span className="font-semibold text-slate-200">Validation Rules</span>
-                <p className="text-[11px] text-slate-400">All rules must pass to complete the mission</p>
+                <span className="font-semibold">Validation Assertions</span>
+                <p className="text-[11px]" style={{ color: 'var(--theme-text-secondary)' }}>
+                  All conditions must pass for the mission to complete
+                </p>
               </div>
               <button
                 type="button"
                 onClick={handleAddRule}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 font-medium transition-all"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-md border font-medium transition-colors hover:bg-white/[0.06]"
+                style={{
+                  borderColor: 'var(--theme-border-strong)',
+                  color: 'var(--theme-text)',
+                }}
               >
-                <Plus size={13} />
-                <span>Add Condition</span>
+                <Plus size={12} style={{ color: 'var(--theme-accent)' }} />
+                <span>Add Assertion</span>
               </button>
             </div>
 
@@ -275,7 +323,11 @@ export const LabBuilderModal: React.FC<LabBuilderModalProps> = ({
               {rules.map((rule, idx) => (
                 <div
                   key={idx}
-                  className="p-3 rounded-xl bg-black/30 border border-white/5 flex flex-col sm:flex-row gap-2 items-start sm:items-center"
+                  className="p-3 rounded-lg border flex flex-col sm:flex-row gap-2 items-start sm:items-center"
+                  style={{
+                    background: 'var(--theme-card-bg)',
+                    borderColor: 'var(--theme-border)',
+                  }}
                 >
                   <select
                     value={rule.type}
@@ -284,7 +336,12 @@ export const LabBuilderModal: React.FC<LabBuilderModalProps> = ({
                         type: e.target.value as CustomMissionRule['type'],
                       })
                     }
-                    className="px-2 py-1.5 rounded-lg bg-[#1a1d2e] border border-white/10 text-slate-200 outline-none shrink-0"
+                    className="px-2.5 py-1.5 rounded-md border outline-none shrink-0"
+                    style={{
+                      background: 'var(--theme-bg)',
+                      borderColor: 'var(--theme-border)',
+                      color: 'var(--theme-text)',
+                    }}
                   >
                     <option value="file_exists">File Exists</option>
                     <option value="file_contains">File Contains Text</option>
@@ -300,10 +357,15 @@ export const LabBuilderModal: React.FC<LabBuilderModalProps> = ({
                       rule.type === 'service_active'
                         ? 'e.g., nginx or ssh'
                         : rule.type === 'command_executed'
-                        ? 'e.g., kubectl scale or git commit'
+                        ? 'e.g., kubectl scale'
                         : '/path/to/target/file'
                     }
-                    className="flex-1 px-3 py-1.5 rounded-lg bg-[#141624] border border-white/10 text-white font-mono placeholder-slate-600 outline-none w-full sm:w-auto"
+                    className="flex-1 px-3 py-1.5 rounded-md border font-mono outline-none w-full sm:w-auto"
+                    style={{
+                      background: 'var(--theme-bg)',
+                      borderColor: 'var(--theme-border)',
+                      color: 'var(--theme-text)',
+                    }}
                   />
 
                   {rule.type === 'file_contains' && (
@@ -312,7 +374,12 @@ export const LabBuilderModal: React.FC<LabBuilderModalProps> = ({
                       value={rule.pattern || ''}
                       onChange={(e) => handleUpdateRule(idx, { pattern: e.target.value })}
                       placeholder="Expected string or regex"
-                      className="flex-1 px-3 py-1.5 rounded-lg bg-[#141624] border border-white/10 text-white font-mono placeholder-slate-600 outline-none w-full sm:w-auto"
+                      className="flex-1 px-3 py-1.5 rounded-md border font-mono outline-none w-full sm:w-auto"
+                      style={{
+                        background: 'var(--theme-bg)',
+                        borderColor: 'var(--theme-border)',
+                        color: 'var(--theme-text)',
+                      }}
                     />
                   )}
 
@@ -320,9 +387,9 @@ export const LabBuilderModal: React.FC<LabBuilderModalProps> = ({
                     type="button"
                     onClick={() => handleRemoveRule(idx)}
                     disabled={rules.length === 1}
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors disabled:opacity-30 disabled:hover:text-slate-500 disabled:hover:bg-transparent"
+                    className="p-1.5 rounded-md text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors disabled:opacity-30"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={13} />
                   </button>
                 </div>
               ))}
@@ -331,18 +398,29 @@ export const LabBuilderModal: React.FC<LabBuilderModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2.5 px-5 py-3 border-t border-white/10 bg-[#16192b]">
+        <div
+          className="flex items-center justify-end gap-2.5 px-5 py-3 border-t"
+          style={{
+            background: 'var(--theme-tab-bg)',
+            borderColor: 'var(--theme-border)',
+          }}
+        >
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 transition-colors font-medium text-xs"
+            className="px-4 py-1.5 rounded-lg border font-medium text-xs hover:bg-white/[0.06] transition-colors"
+            style={{
+              borderColor: 'var(--theme-border)',
+              color: 'var(--theme-text-secondary)',
+            }}
           >
             Cancel
           </button>
           <button
             onClick={handleSaveMission}
-            className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs shadow-lg shadow-purple-600/30 transition-all hover:scale-105"
+            className="px-4 py-1.5 rounded-lg font-semibold text-xs text-white transition-opacity hover:opacity-90"
+            style={{ background: 'var(--theme-accent)' }}
           >
-            Save & Publish Mission
+            Save &amp; Publish Mission
           </button>
         </div>
       </div>

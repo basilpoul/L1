@@ -17,7 +17,6 @@ export const CheatSheetModal: React.FC<CheatSheetModalProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
 
-  // Close on Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -41,7 +40,18 @@ export const CheatSheetModal: React.FC<CheatSheetModalProps> = ({
     const storageKernel = ['lsblk', 'mount', 'umount', 'fdisk', 'journalctl', 'dmesg', 'sysctl'];
     const recorder = ['script', 'replay'];
     const runtimes = ['python3', 'python', 'node', 'sqlite3'];
-    const dnsCrypto = ['ip', 'dig', 'nslookup', 'traceroute', 'base64', 'sha256sum', 'md5sum', 'openssl', 'ssh-keygen', 'ssh-copy-id'];
+    const dnsCrypto = [
+      'ip',
+      'dig',
+      'nslookup',
+      'traceroute',
+      'base64',
+      'sha256sum',
+      'md5sum',
+      'openssl',
+      'ssh-keygen',
+      'ssh-copy-id',
+    ];
     const multiplexJobs = ['tmux', 'watch', 'jobs', 'fg', 'bg', 'sleep', 'nohup'];
     const vim = ['vim', 'vi'];
     const git = ['git'];
@@ -52,9 +62,35 @@ export const CheatSheetModal: React.FC<CheatSheetModalProps> = ({
     const text = ['cat', 'echo', 'grep', 'head', 'tail', 'wc', 'sort', 'uniq', 'nano'];
     const powerText = ['sed', 'awk', 'cut', 'tr', 'diff', 'jq'];
     const archives = ['ln', 'tar', 'zip', 'unzip'];
-    const sysadmin = ['systemctl', 'netstat', 'ss', 'curl', 'wget', 'apt', 'apt-get', 'crontab', 'cowsay', 'figlet'];
+    const sysadmin = [
+      'systemctl',
+      'netstat',
+      'ss',
+      'curl',
+      'wget',
+      'apt',
+      'apt-get',
+      'crontab',
+      'cowsay',
+      'figlet',
+    ];
     const perm = ['chmod', 'chown', 'sudo', 'whoami', 'id'];
-    const sys = ['neofetch', 'uname', 'hostname', 'date', 'uptime', 'cal', 'df', 'du', 'free', 'ps', 'top', 'htop', 'kill', 'ping'];
+    const sys = [
+      'neofetch',
+      'uname',
+      'hostname',
+      'date',
+      'uptime',
+      'cal',
+      'df',
+      'du',
+      'free',
+      'ps',
+      'top',
+      'htop',
+      'kill',
+      'ping',
+    ];
     const script = ['bash', 'sh'];
 
     if (k8sCompose.includes(name)) return 'Kubernetes & Compose';
@@ -116,7 +152,8 @@ export const CheatSheetModal: React.FC<CheatSheetModalProps> = ({
         cmd.description.toLowerCase().includes(q) ||
         cmd.usage.toLowerCase().includes(q) ||
         cmd.flags.some(
-          (f) => f.flag.toLowerCase().includes(q) || f.description.toLowerCase().includes(q)
+          (f) =>
+            f.flag.toLowerCase().includes(q) || f.description.toLowerCase().includes(q)
         )
       );
     });
@@ -125,114 +162,176 @@ export const CheatSheetModal: React.FC<CheatSheetModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-sm animate-fade-in">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/75 backdrop-blur-xs animate-fadeIn select-none"
+    >
       <div
-        className="flex flex-col w-full max-w-4xl h-[85vh] bg-[#121422] border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+        className="flex flex-col w-full max-w-4xl h-[90dvh] sm:h-[85vh] rounded-t-2xl sm:rounded-xl border shadow-2xl overflow-hidden"
+        style={{
+          background: 'var(--theme-surface)',
+          borderColor: 'var(--theme-border-strong)',
+          color: 'var(--theme-text)',
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#16182a]">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
-              <BookOpen size={18} />
-            </div>
+        <div
+          className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b shrink-0"
+          style={{
+            background: 'var(--theme-tab-bg)',
+            borderColor: 'var(--theme-border)',
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <BookOpen size={18} style={{ color: 'var(--theme-accent)' }} />
             <div>
-              <h2 className="text-sm font-bold text-white tracking-wide">Linux Command Reference</h2>
-              <p className="text-xs text-slate-400">Searchable guide for supported commands and syntax</p>
+              <h2 className="text-sm font-bold tracking-tight">Linux Command Documentation</h2>
+              <p className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
+                Interactive manual pages, supported flags, and syntax reference
+              </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-white/[0.06] transition-colors"
+            style={{ color: 'var(--theme-text-secondary)' }}
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* Search & Categories Bar */}
-        <div className="px-6 py-3.5 border-b border-white/5 bg-[#141626]/80 flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+        {/* Search & Segmented Category Filter */}
+        <div
+          className="px-6 py-3.5 border-b flex flex-col gap-3 shrink-0"
+          style={{
+            background: 'var(--theme-bg)',
+            borderColor: 'var(--theme-border)',
+          }}
+        >
+          <div className="relative">
+            <Search
+              size={14}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2"
+              style={{ color: 'var(--theme-muted)' }}
+            />
             <input
               type="text"
-              placeholder="Search commands, flags, descriptions (e.g. grep, -la, permissions)..."
+              placeholder="Search commands, flags, or descriptions (e.g. kubectl, grep, -la, permissions)..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-blue-500/50 transition-colors"
+              className="w-full pl-9 pr-4 py-2 rounded-lg border text-xs outline-none transition-colors"
+              style={{
+                background: 'var(--theme-surface)',
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-text)',
+              }}
               autoFocus
             />
           </div>
 
-          <div className="flex gap-1 overflow-x-auto pb-1 sm:pb-0">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
-                  selectedCategory === cat
-                    ? 'bg-blue-600/30 text-blue-400 border border-blue-500/30'
-                    : 'bg-white/5 text-slate-400 hover:text-slate-200 border border-white/5'
-                }`}
-              >
-                {cat === 'all' ? 'All Commands' : cat}
-              </button>
-            ))}
+          <div className="flex gap-1 overflow-x-auto pb-0.5">
+            {categories.map((cat) => {
+              const isActive = selectedCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
+                    isActive ? 'bg-white/[0.09] text-white' : 'hover:text-white'
+                  }`}
+                  style={!isActive ? { color: 'var(--theme-text-secondary)' } : undefined}
+                >
+                  {cat === 'all' ? 'All Commands' : cat}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Command List Grid */}
+        {/* Command Reference Grid */}
         <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredCommands.map((cmd) => {
             const category = categorize(cmd.name);
             return (
               <div
                 key={cmd.name}
-                className="flex flex-col p-4 rounded-xl bg-[#16182c]/70 border border-white/5 hover:border-blue-500/30 transition-all hover:bg-[#181a32]"
+                className="flex flex-col p-4 rounded-xl border transition-colors"
+                style={{
+                  background: 'var(--theme-card-bg)',
+                  borderColor: 'var(--theme-border)',
+                }}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm font-bold text-cyan-400">{cmd.name}</span>
-                    <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded bg-white/5 text-slate-400 border border-white/5">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span
+                      className="font-mono text-sm font-bold"
+                      style={{ color: 'var(--theme-dir)' }}
+                    >
+                      {cmd.name}
+                    </span>
+                    <span className="opacity-30">·</span>
+                    <span
+                      className="text-[11px]"
+                      style={{ color: 'var(--theme-text-secondary)' }}
+                    >
                       {category}
                     </span>
                   </div>
                   <button
                     onClick={() => copyToClipboard(cmd.usage)}
-                    className="p-1 rounded text-slate-500 hover:text-slate-300 transition-colors"
+                    className="p-1 rounded hover:bg-white/[0.06] transition-colors"
+                    style={{ color: 'var(--theme-text-secondary)' }}
                     title="Copy usage syntax"
                   >
                     {copiedCmd === cmd.usage ? (
-                      <Check size={14} className="text-emerald-400" />
+                      <Check size={13} className="text-emerald-400" />
                     ) : (
-                      <Copy size={14} />
+                      <Copy size={13} />
                     )}
                   </button>
                 </div>
 
-                <p className="text-xs text-slate-300 mb-3">{cmd.description}</p>
+                <p
+                  className="text-xs mb-3 leading-relaxed"
+                  style={{ color: 'var(--theme-text-secondary)' }}
+                >
+                  {cmd.description}
+                </p>
 
-                {/* Syntax */}
-                <div className="p-2 rounded-lg bg-black/40 border border-white/5 mb-3 font-mono text-[11px] text-emerald-400">
-                  <span className="text-slate-500">$ </span>
+                <div
+                  className="p-2.5 rounded-lg border mb-3 font-mono text-[11px]"
+                  style={{
+                    background: 'var(--theme-bg)',
+                    borderColor: 'var(--theme-border)',
+                    color: 'var(--theme-user)',
+                  }}
+                >
+                  <span className="opacity-40">$ </span>
                   {cmd.usage}
                 </div>
 
-                {/* Flags Table */}
                 {cmd.flags && cmd.flags.length > 0 && (
-                  <div className="mt-auto pt-2 border-t border-white/5">
-                    <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 block mb-1.5">
-                      Supported Flags
-                    </span>
-                    <div className="space-y-1">
-                      {cmd.flags.map((flag) => (
-                        <div key={flag.flag} className="flex items-baseline gap-2 text-[11px]">
-                          <span className="font-mono font-semibold text-blue-400 shrink-0">
-                            {flag.flag}
-                          </span>
-                          <span className="text-slate-400 leading-tight">{flag.description}</span>
-                        </div>
-                      ))}
-                    </div>
+                  <div
+                    className="mt-auto pt-2.5 border-t space-y-1"
+                    style={{ borderColor: 'var(--theme-border)' }}
+                  >
+                    {cmd.flags.map((flag) => (
+                      <div key={flag.flag} className="flex items-baseline gap-2.5 text-[11px]">
+                        <span
+                          className="font-mono font-semibold shrink-0"
+                          style={{ color: 'var(--theme-dir)' }}
+                        >
+                          {flag.flag}
+                        </span>
+                        <span
+                          className="leading-snug"
+                          style={{ color: 'var(--theme-text-secondary)' }}
+                        >
+                          {flag.description}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -241,20 +340,32 @@ export const CheatSheetModal: React.FC<CheatSheetModalProps> = ({
 
           {filteredCommands.length === 0 && (
             <div className="col-span-full py-16 text-center">
-              <Terminal size={32} className="mx-auto text-slate-600 mb-2" />
-              <p className="text-sm text-slate-400">No commands match "{search}"</p>
-              <p className="text-xs text-slate-600 mt-1">Try searching by category or flag name</p>
+              <Terminal size={28} className="mx-auto opacity-30 mb-2" />
+              <p className="text-sm font-medium">No commands match &ldquo;{search}&rdquo;</p>
+              <p
+                className="text-xs mt-1"
+                style={{ color: 'var(--theme-text-secondary)' }}
+              >
+                Try searching by command name, flag, or category
+              </p>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-white/5 bg-[#141626] flex items-center justify-between text-xs text-slate-500">
+        <div
+          className="px-6 py-3 border-t flex items-center justify-between text-xs font-mono tabular-nums shrink-0"
+          style={{
+            background: 'var(--theme-tab-bg)',
+            borderColor: 'var(--theme-border)',
+            color: 'var(--theme-muted)',
+          }}
+        >
           <span>
-            Showing <strong className="text-slate-300">{filteredCommands.length}</strong> of{' '}
-            <strong className="text-slate-300">{commands.length}</strong> commands
+            Showing <strong style={{ color: 'var(--theme-text)' }}>{filteredCommands.length}</strong>{' '}
+            of <strong style={{ color: 'var(--theme-text)' }}>{commands.length}</strong> commands
           </span>
-          <span className="font-mono text-[11px]">Tip: Press [Esc] to exit</span>
+          <span>Press ESC to close</span>
         </div>
       </div>
     </div>

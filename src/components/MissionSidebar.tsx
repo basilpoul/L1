@@ -3,12 +3,9 @@ import {
   Trophy,
   CheckCircle2,
   Circle,
-  ChevronLeft,
-  ChevronRight,
   HelpCircle,
-  Sparkles,
-  Award,
   Plus,
+  X,
 } from 'lucide-react';
 import type { Mission } from '../types';
 
@@ -27,8 +24,12 @@ export const MissionSidebar: React.FC<MissionSidebarProps> = ({
   onToggle,
   onOpenLabBuilder,
 }) => {
-  const [filter, setFilter] = useState<'all' | 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'master' | 'architect' | 'cloud-native'>('all');
+  const [filter, setFilter] = useState<
+    'all' | 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'master' | 'architect' | 'cloud-native'
+  >('all');
   const [expandedHints, setExpandedHints] = useState<Record<string, boolean>>({});
+
+  if (!isOpen) return null;
 
   const completedCount = missions.filter((m) => m.completed).length;
   const totalCount = missions.length;
@@ -43,192 +44,259 @@ export const MissionSidebar: React.FC<MissionSidebarProps> = ({
     setExpandedHints((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const getDifficultyColor = (difficulty: Mission['difficulty']) => {
+  const getDifficultyTextColor = (difficulty: Mission['difficulty']) => {
     switch (difficulty) {
       case 'beginner':
-        return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+        return 'text-emerald-400';
       case 'intermediate':
-        return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+        return 'text-amber-400';
       case 'advanced':
-        return 'text-rose-400 bg-rose-500/10 border-rose-500/20';
+        return 'text-rose-400';
       case 'expert':
-        return 'text-purple-400 bg-purple-500/10 border-purple-500/20';
+        return 'text-purple-400';
       case 'master':
-        return 'text-violet-400 bg-violet-500/10 border-violet-500/20';
+        return 'text-violet-400';
       case 'architect':
-        return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20';
+        return 'text-cyan-400';
       case 'cloud-native':
-        return 'text-sky-400 bg-sky-500/10 border-sky-500/20';
+        return 'text-sky-400';
       default:
-        return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
+        return 'text-blue-400';
     }
   };
 
   return (
     <aside
-      className={`relative flex flex-col h-full bg-[#11131f] border-r border-white/5 transition-all duration-300 z-20 ${
-        isOpen ? 'w-84 sm:w-96' : 'w-0'
-      }`}
+      className="fixed inset-x-0 top-12 bottom-14 md:top-11 md:bottom-6 md:right-auto md:left-0 md:w-96 lg:relative lg:inset-auto lg:w-88 xl:w-96 lg:h-full flex flex-col border-r shrink-0 z-30 lg:z-20 shadow-2xl lg:shadow-none select-none animate-fadeIn"
+      style={{
+        background: 'var(--theme-surface)',
+        borderColor: 'var(--theme-border)',
+        color: 'var(--theme-text)',
+      }}
     >
-      {/* External toggle button attached to edge */}
-      <button
-        onClick={onToggle}
-        className="absolute -right-7 top-14 z-30 flex items-center justify-center w-7 h-8 bg-[#181a29] border border-l-0 border-white/10 rounded-r-md text-slate-400 hover:text-white hover:bg-[#202336] transition-colors shadow-lg"
-        title={isOpen ? 'Collapse Missions' : 'Open Practice Missions'}
+      {/* Curriculum Header */}
+      <div
+        className="p-3.5 border-b space-y-3"
+        style={{
+          background: 'var(--theme-tab-bg)',
+          borderColor: 'var(--theme-border)',
+        }}
       >
-        {isOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-      </button>
-
-      {isOpen && (
-        <div className="flex flex-col h-full w-full overflow-hidden">
-          {/* Header */}
-          <div className="p-3.5 border-b border-white/5 bg-[#141624]">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                  <Trophy size={16} />
-                </div>
-                <div>
-                  <h2 className="text-xs font-semibold text-slate-200 tracking-wide uppercase">
-                    Linux Missions
-                  </h2>
-                  <p className="text-[11px] text-slate-400">Interactive curriculum</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {onOpenLabBuilder && (
-                  <button
-                    onClick={onOpenLabBuilder}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-[11px] font-medium transition-all"
-                    title="Design a Custom Mission"
-                  >
-                    <Plus size={11} />
-                    <span>Custom</span>
-                  </button>
-                )}
-                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-emerald-400">
-                  <Award size={12} />
-                  <span>
-                    {completedCount}/{totalCount}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="mt-2">
-              <div className="flex justify-between text-[10px] text-slate-400 mb-1">
-                <span>Curriculum Progress</span>
-                <span className="font-mono">{progressPercent}%</span>
-              </div>
-              <div className="h-1.5 w-full bg-black/40 rounded-full overflow-hidden border border-white/5">
-                <div
-                  className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-400 transition-all duration-500"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Difficulty Tabs */}
-            <div className="flex gap-1 mt-3 p-0.5 bg-black/20 rounded-lg border border-white/5 text-[10px] overflow-x-auto scrollbar-none">
-              {(['all', 'beginner', 'intermediate', 'advanced', 'expert', 'master', 'architect', 'cloud-native'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setFilter(tab)}
-                  className={`flex-1 py-1 px-1 rounded capitalize transition-all whitespace-nowrap ${
-                    filter === tab
-                      ? 'bg-blue-600/30 text-blue-400 font-medium shadow-sm'
-                      : 'text-slate-400 hover:text-slate-300'
-                  }`}
-                >
-                  {tab === 'cloud-native' ? 'Cloud' : tab}
-                </button>
-              ))}
-            </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Trophy size={15} className="text-amber-400" />
+            <span className="text-xs font-semibold tracking-tight">Interactive Curriculum</span>
+            <span className="opacity-30">·</span>
+            <span className="text-xs font-mono tabular-nums text-emerald-400">
+              {completedCount}/{totalCount}
+            </span>
           </div>
 
-          {/* Mission Cards List */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
-            {filteredMissions.map((mission) => {
-              const isHintOpen = !!expandedHints[mission.id];
-
-              return (
-                <div
-                  key={mission.id}
-                  className={`group relative p-3 rounded-xl border transition-all duration-200 ${
-                    mission.completed
-                      ? 'bg-emerald-950/15 border-emerald-500/20 hover:border-emerald-500/30'
-                      : 'bg-[#151726]/80 border-white/5 hover:border-white/10 hover:bg-[#181a2c]'
-                  }`}
-                >
-                  {/* Card Header */}
-                  <div className="flex items-start justify-between gap-2 mb-1.5">
-                    <div className="flex items-center gap-2">
-                      {mission.completed ? (
-                        <CheckCircle2 size={16} className="text-emerald-400 shrink-0 mt-0.5" />
-                      ) : (
-                        <Circle size={16} className="text-slate-600 shrink-0 mt-0.5" />
-                      )}
-                      <h3
-                        className={`text-xs font-semibold leading-tight ${
-                          mission.completed ? 'text-emerald-200 line-through opacity-80' : 'text-slate-200'
-                        }`}
-                      >
-                        {mission.title}
-                      </h3>
-                    </div>
-
-                    <span
-                      className={`text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded border capitalize shrink-0 ${getDifficultyColor(
-                        mission.difficulty
-                      )}`}
-                    >
-                      {mission.difficulty}
-                    </span>
-                  </div>
-
-                  {/* Description */}
-                  <p className="text-[11px] text-slate-400 pl-6 leading-relaxed mb-2.5">
-                    {mission.description}
-                  </p>
-
-                  {/* Actions & Hint */}
-                  <div className="flex items-center justify-between pl-6 pt-1 border-t border-white/5">
-                    <button
-                      onClick={() => toggleHint(mission.id)}
-                      className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-blue-400 transition-colors"
-                    >
-                      <HelpCircle size={12} />
-                      <span>{isHintOpen ? 'Hide hint' : 'Hint'}</span>
-                    </button>
-
-                    <button
-                      onClick={() => onCheckMission(mission.id)}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
-                        mission.completed
-                          ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30'
-                          : 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border border-blue-500/30 hover:shadow-[0_0_12px_rgba(59,130,246,0.3)]'
-                      }`}
-                    >
-                      <Sparkles size={11} />
-                      <span>{mission.completed ? 'Re-verify' : 'Validate'}</span>
-                    </button>
-                  </div>
-
-                  {/* Collapsible Hint */}
-                  {isHintOpen && (
-                    <div className="mt-2.5 pl-6">
-                      <div className="p-2 rounded bg-black/40 border border-amber-500/20 text-[11px] text-amber-300/90 font-mono">
-                        💡 {mission.hint}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <div className="flex items-center gap-1.5">
+            {onOpenLabBuilder && (
+              <button
+                onClick={onOpenLabBuilder}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors hover:bg-white/[0.06]"
+                style={{
+                  borderColor: 'var(--theme-border-strong)',
+                  color: 'var(--theme-text)',
+                }}
+                title="Create Custom Lab Mission"
+              >
+                <Plus size={11} style={{ color: 'var(--theme-accent)' }} />
+                <span>New Lab</span>
+              </button>
+            )}
+            <button
+              onClick={onToggle}
+              className="p-1 rounded-md opacity-60 hover:opacity-100 hover:bg-white/[0.06]"
+              title="Close Curriculum Drawer"
+            >
+              <X size={14} />
+            </button>
           </div>
         </div>
-      )}
+
+        {/* Linear-Style Progress Bar */}
+        <div>
+          <div
+            className="flex justify-between text-[11px] mb-1.5"
+            style={{ color: 'var(--theme-text-secondary)' }}
+          >
+            <span>Mastery Progress</span>
+            <span className="font-mono tabular-nums">{progressPercent}%</span>
+          </div>
+          <div
+            className="h-1.5 w-full rounded-full overflow-hidden"
+            style={{ background: 'var(--theme-bg)' }}
+          >
+            <div
+              className="h-full transition-all duration-300 rounded-full"
+              style={{
+                width: `${progressPercent}%`,
+                background: 'var(--theme-accent)',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Segmented Difficulty Filter Tabs */}
+        <div
+          className="flex gap-1 p-0.5 rounded-lg border text-[11px] overflow-x-auto"
+          style={{
+            background: 'var(--theme-bg)',
+            borderColor: 'var(--theme-border)',
+          }}
+        >
+          {(
+            [
+              'all',
+              'beginner',
+              'intermediate',
+              'advanced',
+              'expert',
+              'master',
+              'architect',
+              'cloud-native',
+            ] as const
+          ).map((tab) => {
+            const isActive = filter === tab;
+            return (
+              <button
+                key={tab}
+                onClick={() => setFilter(tab)}
+                className={`py-1 px-2 rounded-md capitalize transition-colors whitespace-nowrap shrink-0 ${
+                  isActive ? 'bg-white/[0.09] text-white font-medium' : 'hover:text-white'
+                }`}
+                style={!isActive ? { color: 'var(--theme-text-secondary)' } : undefined}
+              >
+                {tab === 'cloud-native' ? 'Cloud' : tab}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Mission Cards List */}
+      <div className="flex-1 overflow-y-auto p-3.5 space-y-2.5">
+        {filteredMissions.map((mission, idx) => {
+          const isHintOpen = !!expandedHints[mission.id];
+
+          return (
+            <div
+              key={mission.id}
+              className="p-3.5 rounded-xl border transition-all"
+              style={{
+                background: mission.completed
+                  ? 'rgba(16, 185, 129, 0.05)'
+                  : 'var(--theme-card-bg)',
+                borderColor: mission.completed
+                  ? 'rgba(16, 185, 129, 0.25)'
+                  : 'var(--theme-border)',
+              }}
+            >
+              {/* Clean Unboxed Kicker Metadata */}
+              <div className="flex items-center justify-between text-[11px] font-mono mb-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="tabular-nums opacity-50">
+                    {String(idx + 1).padStart(2, '0')}
+                  </span>
+                  <span className="opacity-30">·</span>
+                  <span className={`capitalize ${getDifficultyTextColor(mission.difficulty)}`}>
+                    {mission.difficulty}
+                  </span>
+                  {mission.completed && (
+                    <>
+                      <span className="opacity-30">·</span>
+                      <span className="text-emerald-400">Verified</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Mission Title */}
+              <div className="flex items-start gap-2 mb-1.5">
+                {mission.completed ? (
+                  <CheckCircle2 size={15} className="text-emerald-400 shrink-0 mt-0.5" />
+                ) : (
+                  <Circle
+                    size={15}
+                    className="shrink-0 mt-0.5 opacity-40"
+                    style={{ color: 'var(--theme-text-secondary)' }}
+                  />
+                )}
+                <h3
+                  className={`text-xs font-semibold leading-snug ${
+                    mission.completed ? 'line-through opacity-75' : ''
+                  }`}
+                >
+                  {mission.title}
+                </h3>
+              </div>
+
+              {/* Description */}
+              <p
+                className="text-xs pl-6 leading-relaxed mb-3"
+                style={{ color: 'var(--theme-text-secondary)' }}
+              >
+                {mission.description}
+              </p>
+
+              {/* Actions Row */}
+              <div
+                className="flex items-center justify-between pl-6 pt-2 border-t"
+                style={{ borderColor: 'var(--theme-border)' }}
+              >
+                <button
+                  onClick={() => toggleHint(mission.id)}
+                  className="flex items-center gap-1 text-[11px] hover:underline transition-colors"
+                  style={{ color: 'var(--theme-text-secondary)' }}
+                >
+                  <HelpCircle size={12} />
+                  <span>{isHintOpen ? 'Hide hint' : 'Show hint'}</span>
+                </button>
+
+                <button
+                  onClick={() => onCheckMission(mission.id)}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+                    mission.completed
+                      ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25 hover:bg-emerald-500/20'
+                      : 'hover:bg-white/[0.08]'
+                  }`}
+                  style={
+                    !mission.completed
+                      ? {
+                          background: 'var(--theme-accent-soft)',
+                          borderColor: 'var(--theme-border-strong)',
+                          color: 'var(--theme-text)',
+                        }
+                      : undefined
+                  }
+                >
+                  {mission.completed ? 'Re-verify' : 'Verify Task'}
+                </button>
+              </div>
+
+              {/* Collapsible Hint */}
+              {isHintOpen && (
+                <div className="mt-2.5 pl-6 animate-fadeIn">
+                  <div
+                    className="p-2.5 rounded-lg border text-[11px] font-mono leading-relaxed"
+                    style={{
+                      background: 'var(--theme-bg)',
+                      borderColor: 'var(--theme-border-strong)',
+                      color: 'var(--theme-text)',
+                    }}
+                  >
+                    <span className="text-amber-400 font-sans font-semibold mr-1.5">Hint:</span>
+                    {mission.hint}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </aside>
   );
 };
